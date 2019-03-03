@@ -17,6 +17,32 @@
 #include "xdg-shell-client-protocol.h"
 #define _POSIX_C_SOURCE 200809L
 
+
+struct wl_display *g_display;
+struct wl_compositor *g_compositor;
+struct wl_seat *g_seat;
+struct xkb_keymap *g_xkb_keymap;
+struct wl_keyboard *g_kbd;
+struct xdg_wm_base *g_xdg_wm_base;
+
+struct window {
+    struct wl_surface *surface;
+    struct xdg_surface *xdg_surface;
+    struct xdg_toplevel *xdg_toplevel;
+
+    struct wl_buffer *buffer;
+    void *shm_data;
+    /* struct wl_shm *shm; */
+
+    cairo_t *cairo;
+
+    int width;
+    int height;
+
+    bool resized;
+    bool configured;
+};
+
 bool configured = false;
 static char *font = "Mono";
 
@@ -28,22 +54,22 @@ struct wl_keyboard *kbd;
 struct xkb_keymap *xkb_keymap;
 struct xkb_context *xkb_context;
 struct xkb_state *xkb_state;
-struct xdg_surface *xdg_surface;
+/* struct xdg_surface *xdg_surface; */
+/* struct xdg_toplevel *xdg_toplevel; */
 struct xdg_wm_base *xdg_wm_base;
-struct xdg_toplevel *xdg_toplevel;
-struct wl_shm_pool *pool;
-struct wl_buffer *buffer;
+/* struct wl_shm_pool *pool; */
+/* struct wl_buffer *buffer; */
 int scale = 2;
 
-cairo_t *cairo;
-struct wl_buffer *buffer;
-struct wl_surface *surface;
-void *shm_data = NULL;
+/* cairo_t *cairo; */
+/* struct wl_buffer *buffer; */
+/* struct wl_surface *surface; */
+/* void *shm_data = NULL; */
 size_t shm_data_len;
 
-int window_width = 200;
-int window_height = 200;
-bool resized = true;
+/* int window_width = 200; */
+/* int window_height = 200; */
+/* bool resized = true; */
 bool running;
 
 static const char overflow[] = "[buffer overflow]";
@@ -250,19 +276,21 @@ static void resize_surface();
 static void handle_toplevel_configure(void *data, struct xdg_toplevel *toplevel,
                                       int32_t width, int32_t height,
                                       struct wl_array *states) {
-    resized = (width != window_width || height != window_height);
+
+    struct window *w = data;
+    w->resized = (width != w->width || height != w->height);
 
     if (width && height) {
-        window_width = width;
-        window_height = height;
+        w->width = width;
+        w->height = height;
     }
-    fprintf(stderr, "width: %i, height: %i\n", window_width, window_height);
-    if (configured) {
-        resize_surface();
+    fprintf(stderr, "width: %i, height: %i\n", w->width, w->height);
+    if (w->configured) {
+        resize_surface(w);
         wl_display_roundtrip(display);
-        wl_surface_commit(surface);
+        wl_surface_commit(w->surface);
     }
-    configured = true;
+    w->configured = true;
 }
 
 static void handle_toplevel_close(void *data, struct xdg_toplevel *xdg_toplevel) {
@@ -280,20 +308,21 @@ static void handle_ping(void *data, struct xdg_wm_base *xdg_wm_base, uint32_t se
 
 static const struct xdg_wm_base_listener xdg_base_listener = {.ping = handle_ping};
 
-void draw() {
+void draw(struct window * w) {
+    cairo_t *cairo = w->cairo;
     cairo_move_to(cairo, 0, 0);
     cairo_set_source_u32(cairo, 0x0);
-    cairo_rectangle(cairo, 0, 0, window_width * scale, window_height * scale);
+    cairo_rectangle(cairo, 0, 0, w->width * scale, w->height * scale);
     cairo_fill(cairo);
     cairo_set_source_u32(cairo, 0xffffffff);
-    cairo_rectangle(cairo, 200, 200, window_width * 2 - 400, window_height * 2 - 400);
+    cairo_rectangle(cairo, 200, 200, w->width * 2 - 400, w->height * 2 - 400);
 
     cairo_fill(cairo);
 
     cairo_set_source_u32(cairo, 0x000000ff);
     cairo_move_to(cairo, 200, 200);
-    cairo_line_to(cairo, window_width * scale - 200, 200);
-    cairo_line_to(cairo, 200, window_height * scale - 200);
+    cairo_line_to(cairo, w->width * scale - 200, 200);
+    cairo_line_to(cairo, 200, w->height * scale - 200);
     cairo_close_path(cairo);
     cairo_fill(cairo);
 
@@ -302,34 +331,35 @@ void draw() {
     pango_printf(cairo, font, scale, false, "emacs");
 }
 
-static void resize_surface() {
+static void resize_surface(struct window *window) {
     fprintf(stderr, "resizing surface\n");
-    int stride = window_width * 4;
-    int size = stride * window_height;
+    int stride = window->width * 4;
+    int size = stride * window->height;
 
     int fd = create_shm_file(size * scale * scale);
-    shm_data = mmap(NULL, size * scale * scale, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-    pool = wl_shm_create_pool(shm, fd, size * scale * scale);
-    buffer = wl_shm_pool_create_buffer(pool, 0, window_width * scale,
-                                       window_height * scale, stride * scale,
+    window->shm_data = mmap(NULL, size * scale * scale, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    struct wl_shm_pool *pool = wl_shm_create_pool(shm, fd, size * scale * scale);
+    window->buffer = wl_shm_pool_create_buffer(pool, 0, window->width * scale,
+                                       window->height * scale, stride * scale,
                                        WL_SHM_FORMAT_ARGB8888);
 
-    wl_buffer_add_listener(buffer, &buffer_listener, NULL);
+    wl_buffer_add_listener(window->buffer, &buffer_listener, NULL);
 
     cairo_surface_t *s = cairo_image_surface_create_for_data(
-        shm_data, CAIRO_FORMAT_ARGB32,
-        window_width *scale, window_height * scale,
-        window_width * 4 * scale);
+        window->shm_data, CAIRO_FORMAT_ARGB32,
+        window->width *scale, window->height * scale,
+        window->width * 4 * scale);
 
-    cairo = cairo_create(s);
+    window->cairo = cairo_create(s);
 
-    wl_surface_attach(surface, buffer, 0, 0);
+    wl_surface_attach(window->surface, window->buffer, 0, 0);
 }
 
 static void handle_xdg_buffer_configure(void *data, struct xdg_surface *xdg_surface,
                                         uint32_t serial) {
+    struct window *w = data;
     fprintf(stderr, "configured xdg surface\n");
-    xdg_surface_ack_configure(xdg_surface, serial);
+    xdg_surface_ack_configure(w->xdg_surface, serial);
 }
 
 static struct xdg_surface_listener xdg_surface_listener = {
@@ -362,6 +392,34 @@ static const struct wl_registry_listener registry_listener = {
     .global_remove = handle_global_remove,
 };
 
+struct window *create_window() {
+    struct window *w = malloc(sizeof(struct window));
+    w->configured = false;
+    w->width = 200;
+    w->height = 200;
+    w->resized = true;
+
+    w->surface = wl_compositor_create_surface(compositor);
+	wl_surface_set_buffer_scale(w->surface, scale);
+
+    w->xdg_surface = xdg_wm_base_get_xdg_surface(xdg_wm_base, w->surface);
+    w->xdg_toplevel = xdg_surface_get_toplevel(w->xdg_surface);
+
+    xdg_surface_add_listener(w->xdg_surface, &xdg_surface_listener, w);
+    xdg_toplevel_add_listener(w->xdg_toplevel, &xdg_toplevel_listener, w);
+
+    xdg_toplevel_set_title(w->xdg_toplevel, "lol");
+    wl_surface_commit(w->surface);
+
+    wl_display_roundtrip(display);
+    resize_surface(w);
+
+    wl_surface_commit(w->surface);
+
+    return w;
+}
+
+
 int main(int argc, char *argv[]) {
     fprintf(stderr, "clocks per second: %lu\n", CLOCKS_PER_SEC);
 
@@ -371,28 +429,16 @@ int main(int argc, char *argv[]) {
 
     wl_display_roundtrip(display);
 
-    surface = wl_compositor_create_surface(compositor);
-	wl_surface_set_buffer_scale(surface, scale);
-
-    xdg_surface = xdg_wm_base_get_xdg_surface(xdg_wm_base, surface);
-    xdg_toplevel = xdg_surface_get_toplevel(xdg_surface);
-
-    xdg_surface_add_listener(xdg_surface, &xdg_surface_listener, NULL);
-    xdg_toplevel_add_listener(xdg_toplevel, &xdg_toplevel_listener, NULL);
-
-    xdg_toplevel_set_title(xdg_toplevel, "lol");
-
-    wl_surface_commit(surface);
-
-    wl_display_roundtrip(display);
-    resize_surface();
-
-    wl_surface_commit(surface);
+    struct window *w = create_window();
+    struct window *w2 = create_window();
 
     running = true;
     while (wl_display_dispatch(display) != -1 && running) {
-        if (resized) {
-            draw();
+        if (w->resized) {
+            draw(w);
+        }
+        if (w2->resized) {
+            draw(w2);
         }
     }
 

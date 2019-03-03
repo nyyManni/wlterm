@@ -246,32 +246,19 @@ static void buffer_release(void *data, struct wl_buffer *wl_buffer) {}
 
 static const struct wl_buffer_listener buffer_listener = {.release = buffer_release};
 
+static void resize_surface();
 static void handle_toplevel_configure(void *data, struct xdg_toplevel *toplevel,
                                       int32_t width, int32_t height,
                                       struct wl_array *states) {
     resized = (width != window_width || height != window_height);
 
-    if (width != 0 && height) {
+    if (width && height) {
         window_width = width;
         window_height = height;
     }
     fprintf(stderr, "width: %i, height: %i\n", window_width, window_height);
     if (configured) {
-        fprintf(stderr, "resizing...\n");
-        int stride = window_width * 4;
-        int size = stride * window_height;
-        int fd = create_shm_file(size * scale * scale);
-        shm_data = mmap(NULL, size * scale * scale, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-        pool = wl_shm_create_pool(shm, fd, size * scale * scale);
-        buffer = wl_shm_pool_create_buffer(pool, 0, window_width * scale, window_height * scale, stride * scale,
-                                           WL_SHM_FORMAT_ARGB8888);
-        wl_buffer_add_listener(buffer, &buffer_listener, NULL);
-        cairo_surface_t *s = cairo_image_surface_create_for_data(
-                       shm_data, CAIRO_FORMAT_ARGB32, window_width * scale, window_height * scale, window_width * 4 * scale);
-
-        cairo = cairo_create(s);
-        wl_surface_attach(surface, buffer, 0, 0);
-
+        resize_surface();
         wl_display_roundtrip(display);
         wl_surface_commit(surface);
     }

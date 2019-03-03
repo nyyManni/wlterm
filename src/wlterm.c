@@ -30,6 +30,8 @@ long long current_timestamp() {
     // printf("milliseconds: %lld\n", milliseconds);
     return milliseconds;
 }
+
+bool lol = false;
 /* void print_current_time_with_ms (void) */
 /* { */
 /*     long            ms; // Milliseconds */
@@ -48,7 +50,7 @@ long long current_timestamp() {
 /*     printf("Current time: %"PRIdMAX".%03ld seconds since the Epoch\n", */
 /*            (intmax_t)s, ms); */
 /* } */
-
+struct wl_display *display;
 struct wl_seat *seat;
 struct wl_compositor *compositor;
 struct wl_shm *shm;
@@ -59,11 +61,14 @@ struct xkb_state *xkb_state;
 struct xdg_surface *xdg_surface;
 struct xdg_wm_base *xdg_wm_base;
 struct xdg_toplevel *xdg_toplevel;
+struct wl_shm_pool *pool;
+struct wl_buffer *buffer;
 
 cairo_t *cairo;
 struct wl_buffer *buffer;
 struct wl_surface *surface;
-void *shm_data;
+void *shm_data = NULL;
+size_t shm_data_len;
 
 int window_width = 200;
 int window_height = 200;
@@ -115,6 +120,7 @@ int create_shm_file(off_t size) {
         close(fd);
         return -1;
     }
+    shm_data_len = size;
 
     return fd;
 }
@@ -201,10 +207,10 @@ static void handle_toplevel_configure(void *data, struct xdg_toplevel *toplevel,
                                       struct wl_array *states) {
     resized = (width != window_width || height != window_height);
 
-    /* if (width != 0 && height) { */
-    /*     window_width = width; */
-    /*     window_height = height; */
-    /* } */
+    if (width != 0 && height) {
+        window_width = width;
+        window_height = height;
+    }
     fprintf(stderr, "width: %i, height: %i\n", window_width, window_height);
 }
 
@@ -227,12 +233,22 @@ static void buffer_release(void *data, struct wl_buffer *wl_buffer) {}
 
 static const struct wl_buffer_listener buffer_listener = {.release = buffer_release};
 
+void draw() {
+    cairo_set_source_u32(cairo, 0x0);
+    cairo_rectangle(cairo, 0, 0, window_width, window_height);
+    cairo_fill(cairo);
+    cairo_set_source_u32(cairo, 0xffffffff);
+    cairo_rectangle(cairo, 100, 100, window_width - 200, window_height - 200);
+
+    cairo_fill(cairo);
+}
+
 static void resize_surface() {
     fprintf(stderr, "resizing surface\n");
-    int32_t width = window_width;
-    int32_t height = window_height;
-    int stride = width * 4;
-    int size = stride * height;
+    /* int32_t width = window_width; */
+    /* int32_t height = window_height; */
+    int stride = window_width * 4;
+    int size = stride * window_height;
 
     int fd = create_shm_file(size);
     /* if (fd < 0) { */
@@ -245,21 +261,21 @@ static void resize_surface() {
     /*     close(fd); */
     /*     return 1; */
     /* } */
-    struct wl_shm_pool *pool = wl_shm_create_pool(shm, fd, size);
-    struct wl_buffer *buffer =
-        wl_shm_pool_create_buffer(pool, 0, width, height, stride, WL_SHM_FORMAT_ARGB8888);
-    wl_shm_pool_destroy(pool);
+    pool = wl_shm_create_pool(shm, fd, size);
+    buffer = wl_shm_pool_create_buffer(pool, 0, window_width, window_height, stride,
+                                       WL_SHM_FORMAT_ARGB8888);
+    /* wl_shm_pool_destroy(pool); */
 
     wl_buffer_add_listener(buffer, &buffer_listener, NULL);
 
     cairo_surface_t *s = cairo_image_surface_create_for_data(
-        shm_data, CAIRO_FORMAT_ARGB32, width, height, width * 4);
+        shm_data, CAIRO_FORMAT_ARGB32, window_width, window_height, window_width * 4);
 
     cairo = cairo_create(s);
 
     /* fprintf(stderr, "clearing rectanglge: %ix%i\n", width, height); */
     cairo_set_source_u32(cairo, 0xffffffff);
-    cairo_rectangle(cairo, 0, 0, width, height);
+    cairo_rectangle(cairo, 0, 0, window_width, window_height);
     cairo_fill(cairo);
 
     /* wl_display_roundtrip(display); */
@@ -269,10 +285,42 @@ static void resize_surface() {
 static void handle_xdg_buffer_configure(void *data, struct xdg_surface *xdg_surface,
                                         uint32_t serial) {
     fprintf(stderr, "configuring xdg surface\n");
-    if (resized) {
+    if (lol) {
+        fprintf(stderr, "resizing...\n");
+        /* int32_t width = window_width; */
+        /* int32_t height = window_height; */
+        int stride = window_width * 4;
+        int size = stride * window_height;
+        int fd = create_shm_file(size);
+        /* if (fd < 0) { */
+        /*     fprintf(stderr, "creating a buffer file for %d B failed: %m\n", size); */
+        /*     return 1; */
+        /* } */
+        /* if (shm_data) { */
+        /*     munmap(shm_data, shm_data_len); */
+        /* } */
+        shm_data = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+        /* wl_buffer_destroy(buffer); */
+        pool = wl_shm_create_pool(shm, fd, size);
+        buffer = wl_shm_pool_create_buffer(pool, 0, window_width, window_height, stride,
+                                           WL_SHM_FORMAT_ARGB8888);
+        wl_buffer_add_listener(buffer, &buffer_listener, NULL);
         /* resize_surface(); */
         /* wl_surface_commit(surface); */
+        cairo_surface_t *s = cairo_image_surface_create_for_data(
+            shm_data, CAIRO_FORMAT_ARGB32, window_width, window_height, window_width * 4);
+
+        cairo = cairo_create(s);
+
+        /* fprintf(stderr, "clearing rectanglge: %ix%i\n", width, height); */
+
+        /* wl_display_roundtrip(display); */
+        wl_surface_attach(surface, buffer, 0, 0);
+
+        wl_display_roundtrip(display);
+        wl_surface_commit(surface);
     }
+    lol = true;
 
     xdg_surface_ack_configure(xdg_surface, serial);
 }
@@ -296,22 +344,6 @@ static void handle_global(void *data, struct wl_registry *registry, uint32_t nam
 
     } else if (strcmp(interface, xdg_wm_base_interface.name) == 0) {
         xdg_wm_base = wl_registry_bind(registry, name, &xdg_wm_base_interface, version);
-
-    /* } else if (strcmp(interface, "zxdg_shell_v6") == 0) { */
-    /*     fprintf(stderr, "got shell\n"); */
-        /* xdg_wm_base = wl_registry_bind(registry, name, &xdg_wm_base_interface,
-         * version); */
-
-        /* } else if (strcmp(interface, xdg_toplevel_interface.name) == 0) { */
-        /* 	/\* xdg_wm_base = wl_registry_bind(registry, name,
-         * &xdg_wm_base_interface, 1); *\/ */
-        /* 	xdg_toplevel = wl_registry_bind(registry, name, &xdg_toplevel_interface,
-         * 1); */
-        /* 	/\* xdg_wm_base_add_listener(xdg_wm_base, &xdg_base_listener, NULL); *\/
-         */
-        /* 	xdg_toplevel_add_listener(xdg_toplevel, &xdg_toplevel_listener, NULL); */
-
-        /* 	/\* xdg_surface_add_listener(xdg_surface, &, void *data) *\/ */
     }
 }
 
@@ -323,22 +355,21 @@ static const struct wl_registry_listener registry_listener = {
     .global_remove = handle_global_remove,
 };
 
-#define TOCK fprintf(stderr, "%d: %f\n", __LINE__, (double)(current_timestamp() - begin) / 1000);
+#define TOCK                                                                             \
+    fprintf(stderr, "%d: %f\n", __LINE__, (double)(current_timestamp() - begin) / 1000);
 int main(int argc, char *argv[]) {
     begin = current_timestamp();
     fprintf(stderr, "clocks per second: %lu\n", CLOCKS_PER_SEC);
-    
-    struct wl_display *display = wl_display_connect(NULL);
+
+    display = wl_display_connect(NULL);
     struct wl_registry *registry = wl_display_get_registry(display);
     wl_registry_add_listener(registry, &registry_listener, NULL);
-    
 
     wl_display_roundtrip(display);
-    
+
     /* wl_display_roundtrip(display); */
 
     surface = wl_compositor_create_surface(compositor);
-    
 
     xdg_surface = xdg_wm_base_get_xdg_surface(xdg_wm_base, surface);
     xdg_toplevel = xdg_surface_get_toplevel(xdg_surface);
@@ -347,19 +378,16 @@ int main(int argc, char *argv[]) {
     xdg_toplevel_add_listener(xdg_toplevel, &xdg_toplevel_listener, NULL);
 
     xdg_toplevel_set_title(xdg_toplevel, "lol");
-    
 
     /* wl_display_roundtrip(display); */
     wl_surface_commit(surface);
-    
+
     wl_display_roundtrip(display);
-    
 
     /* here, do your time-consuming job */
     resize_surface();
 
     wl_surface_commit(surface);
-    
 
     /* wl_display_roundtrip(display); */
 
@@ -367,6 +395,10 @@ int main(int argc, char *argv[]) {
     while (wl_display_dispatch(display) != -1 && running) {
         clock_t c2 = clock();
         fprintf(stderr, "cycle\n");
+        /*     resize_surface(); */
+        /*     wl_surface_attach(surface, buffer, 0, 0); */
+        /* wl_surface_commit(surface); */
+        draw();
     }
 
     wl_display_disconnect(display);

@@ -33,6 +33,7 @@ struct xdg_wm_base *xdg_wm_base;
 struct xdg_toplevel *xdg_toplevel;
 struct wl_shm_pool *pool;
 struct wl_buffer *buffer;
+int scale = 2;
 
 cairo_t *cairo;
 struct wl_buffer *buffer;
@@ -259,14 +260,14 @@ static void handle_toplevel_configure(void *data, struct xdg_toplevel *toplevel,
         fprintf(stderr, "resizing...\n");
         int stride = window_width * 4;
         int size = stride * window_height;
-        int fd = create_shm_file(size);
-        shm_data = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-        pool = wl_shm_create_pool(shm, fd, size);
-        buffer = wl_shm_pool_create_buffer(pool, 0, window_width, window_height, stride,
+        int fd = create_shm_file(size * scale * scale);
+        shm_data = mmap(NULL, size * scale * scale, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+        pool = wl_shm_create_pool(shm, fd, size * scale * scale);
+        buffer = wl_shm_pool_create_buffer(pool, 0, window_width * scale, window_height * scale, stride * scale,
                                            WL_SHM_FORMAT_ARGB8888);
         wl_buffer_add_listener(buffer, &buffer_listener, NULL);
         cairo_surface_t *s = cairo_image_surface_create_for_data(
-            shm_data, CAIRO_FORMAT_ARGB32, window_width, window_height, window_width * 4);
+                       shm_data, CAIRO_FORMAT_ARGB32, window_width * scale, window_height * scale, window_width * 4 * scale);
 
         cairo = cairo_create(s);
         wl_surface_attach(surface, buffer, 0, 0);
@@ -293,24 +294,25 @@ static void handle_ping(void *data, struct xdg_wm_base *xdg_wm_base, uint32_t se
 static const struct xdg_wm_base_listener xdg_base_listener = {.ping = handle_ping};
 
 void draw() {
+    cairo_move_to(cairo, 0, 0);
     cairo_set_source_u32(cairo, 0x0);
-    cairo_rectangle(cairo, 0, 0, window_width, window_height);
+    cairo_rectangle(cairo, 0, 0, window_width * scale, window_height * scale);
     cairo_fill(cairo);
     cairo_set_source_u32(cairo, 0xffffffff);
-    cairo_rectangle(cairo, 100, 100, window_width - 200, window_height - 200);
+    cairo_rectangle(cairo, 200, 200, window_width * 2 - 400, window_height * 2 - 400);
 
     cairo_fill(cairo);
 
     cairo_set_source_u32(cairo, 0x000000ff);
-    cairo_move_to(cairo, 100, 100);
-    cairo_line_to(cairo, window_width - 100, 100);
-    cairo_line_to(cairo, 100, window_height - 100);
+    cairo_move_to(cairo, 200, 200);
+    cairo_line_to(cairo, window_width * scale - 200, 200);
+    cairo_line_to(cairo, 200, window_height * scale - 200);
     cairo_close_path(cairo);
     cairo_fill(cairo);
 
     cairo_set_source_u32(cairo, 0xffffffff);
-    cairo_move_to(cairo, 150, 150);
-    pango_printf(cairo, font, 2, false, "emacs");
+    cairo_move_to(cairo, 250, 250);
+    pango_printf(cairo, font, scale, false, "emacs");
 }
 
 static void resize_surface() {
@@ -318,16 +320,19 @@ static void resize_surface() {
     int stride = window_width * 4;
     int size = stride * window_height;
 
-    int fd = create_shm_file(size);
-    shm_data = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-    pool = wl_shm_create_pool(shm, fd, size);
-    buffer = wl_shm_pool_create_buffer(pool, 0, window_width, window_height, stride,
+    int fd = create_shm_file(size * scale * scale);
+    shm_data = mmap(NULL, size * scale * scale, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    pool = wl_shm_create_pool(shm, fd, size * scale * scale);
+    buffer = wl_shm_pool_create_buffer(pool, 0, window_width * scale,
+                                       window_height * scale, stride * scale,
                                        WL_SHM_FORMAT_ARGB8888);
 
     wl_buffer_add_listener(buffer, &buffer_listener, NULL);
 
     cairo_surface_t *s = cairo_image_surface_create_for_data(
-        shm_data, CAIRO_FORMAT_ARGB32, window_width, window_height, window_width * 4);
+        shm_data, CAIRO_FORMAT_ARGB32,
+        window_width *scale, window_height * scale,
+        window_width * 4 * scale);
 
     cairo = cairo_create(s);
 
@@ -380,6 +385,7 @@ int main(int argc, char *argv[]) {
     wl_display_roundtrip(display);
 
     surface = wl_compositor_create_surface(compositor);
+	wl_surface_set_buffer_scale(surface, scale);
 
     xdg_surface = xdg_wm_base_get_xdg_surface(xdg_wm_base, surface);
     xdg_toplevel = xdg_surface_get_toplevel(xdg_surface);

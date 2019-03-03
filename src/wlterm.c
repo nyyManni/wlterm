@@ -16,40 +16,10 @@
 #include "xdg-shell-client-protocol.h"
 #define _POSIX_C_SOURCE 200809L
 
-#include <inttypes.h>
-#include <math.h>
-#include <stdio.h>
-#include <sys/time.h>
-#include <time.h>
 
-long long current_timestamp() {
-    struct timeval te;
-    gettimeofday(&te, NULL); // get current time
-    long long milliseconds =
-        te.tv_sec * 1000LL + te.tv_usec / 1000; // calculate milliseconds
-    // printf("milliseconds: %lld\n", milliseconds);
-    return milliseconds;
-}
 
-bool lol = false;
-/* void print_current_time_with_ms (void) */
-/* { */
-/*     long            ms; // Milliseconds */
-/*     time_t          s;  // Seconds */
-/*     struct timespec spec; */
+bool configured = false;
 
-/*     clock_gettime(CLOCK_REALTIME, &spec); */
-
-/*     s  = spec.tv_sec; */
-/*     ms = round(spec.tv_nsec / 1.0e6); // Convert nanoseconds to milliseconds */
-/*     if (ms > 999) { */
-/*         s++; */
-/*         ms = 0; */
-/*     } */
-
-/*     printf("Current time: %"PRIdMAX".%03ld seconds since the Epoch\n", */
-/*            (intmax_t)s, ms); */
-/* } */
 struct wl_display *display;
 struct wl_seat *seat;
 struct wl_compositor *compositor;
@@ -74,7 +44,7 @@ int window_width = 200;
 int window_height = 200;
 bool resized = true;
 bool running;
-long long begin;
+
 void cairo_set_source_u32(cairo_t *cairo, uint32_t color) {
     cairo_set_source_rgba(
         cairo, (color >> (3 * 8) & 0xFF) / 255.0, (color >> (2 * 8) & 0xFF) / 255.0,
@@ -92,7 +62,7 @@ static void randname(char *buf) {
 }
 
 static int anonymous_shm_open(void) {
-    char name[] = "/dmenu-XXXXXX";
+    char name[] = "/emacs-XXXXXX";
     int retries = 100;
 
     do {
@@ -166,13 +136,8 @@ static void keyboard_modifiers(void *data, struct wl_keyboard *keyboard, uint32_
 
 static void keyboard_key(void *data, struct wl_keyboard *wl_keyboard, uint32_t serial,
                          uint32_t time, uint32_t key, uint32_t _key_state) {
-    /* struct dmenu_panel *panel = data; */
-
     enum wl_keyboard_key_state key_state = _key_state;
     xkb_keysym_t sym = xkb_state_key_get_one_sym(xkb_state, key + 8);
-    /* if (panel->on_keyevent) */
-    /* 	panel->on_keyevent(panel, key_state, sym, panel->keyboard.control, */
-    /* 					   panel->keyboard.shift); */
     fprintf(stderr, "handling keyinput\n");
 }
 
@@ -201,6 +166,9 @@ const struct wl_seat_listener seat_listener = {
     .capabilities = seat_handle_capabilities,
     .name = seat_handle_name,
 };
+static void buffer_release(void *data, struct wl_buffer *wl_buffer) {}
+
+static const struct wl_buffer_listener buffer_listener = {.release = buffer_release};
 
 static void handle_toplevel_configure(void *data, struct xdg_toplevel *toplevel,
                                       int32_t width, int32_t height,
@@ -212,6 +180,26 @@ static void handle_toplevel_configure(void *data, struct xdg_toplevel *toplevel,
         window_height = height;
     }
     fprintf(stderr, "width: %i, height: %i\n", window_width, window_height);
+    if (configured) {
+        fprintf(stderr, "resizing...\n");
+        int stride = window_width * 4;
+        int size = stride * window_height;
+        int fd = create_shm_file(size);
+        shm_data = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+        pool = wl_shm_create_pool(shm, fd, size);
+        buffer = wl_shm_pool_create_buffer(pool, 0, window_width, window_height, stride,
+                                           WL_SHM_FORMAT_ARGB8888);
+        wl_buffer_add_listener(buffer, &buffer_listener, NULL);
+        cairo_surface_t *s = cairo_image_surface_create_for_data(
+            shm_data, CAIRO_FORMAT_ARGB32, window_width, window_height, window_width * 4);
+
+        cairo = cairo_create(s);
+        wl_surface_attach(surface, buffer, 0, 0);
+
+        wl_display_roundtrip(display);
+        wl_surface_commit(surface);
+    }
+    configured = true;
 }
 
 static void handle_toplevel_close(void *data, struct xdg_toplevel *xdg_toplevel) {
@@ -229,9 +217,6 @@ static void handle_ping(void *data, struct xdg_wm_base *xdg_wm_base, uint32_t se
 
 static const struct xdg_wm_base_listener xdg_base_listener = {.ping = handle_ping};
 
-static void buffer_release(void *data, struct wl_buffer *wl_buffer) {}
-
-static const struct wl_buffer_listener buffer_listener = {.release = buffer_release};
 
 void draw() {
     cairo_set_source_u32(cairo, 0x0);
@@ -241,30 +226,25 @@ void draw() {
     cairo_rectangle(cairo, 100, 100, window_width - 200, window_height - 200);
 
     cairo_fill(cairo);
+
+    cairo_set_source_u32(cairo, 0x000000ff);
+    cairo_move_to(cairo, 100, 100);
+    cairo_line_to(cairo, window_width - 100, 100);
+    cairo_line_to(cairo, 100, window_height - 100);
+    cairo_close_path(cairo);
+    cairo_fill(cairo);
 }
 
 static void resize_surface() {
     fprintf(stderr, "resizing surface\n");
-    /* int32_t width = window_width; */
-    /* int32_t height = window_height; */
     int stride = window_width * 4;
     int size = stride * window_height;
 
     int fd = create_shm_file(size);
-    /* if (fd < 0) { */
-    /*     fprintf(stderr, "creating a buffer file for %d B failed: %m\n", size); */
-    /*     return 1; */
-    /* } */
     shm_data = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-    /* if (shm_data == MAP_FAILED) { */
-    /*     fprintf(stderr, "mmap failed: %m\n"); */
-    /*     close(fd); */
-    /*     return 1; */
-    /* } */
     pool = wl_shm_create_pool(shm, fd, size);
     buffer = wl_shm_pool_create_buffer(pool, 0, window_width, window_height, stride,
                                        WL_SHM_FORMAT_ARGB8888);
-    /* wl_shm_pool_destroy(pool); */
 
     wl_buffer_add_listener(buffer, &buffer_listener, NULL);
 
@@ -273,54 +253,12 @@ static void resize_surface() {
 
     cairo = cairo_create(s);
 
-    /* fprintf(stderr, "clearing rectanglge: %ix%i\n", width, height); */
-    cairo_set_source_u32(cairo, 0xffffffff);
-    cairo_rectangle(cairo, 0, 0, window_width, window_height);
-    cairo_fill(cairo);
-
-    /* wl_display_roundtrip(display); */
     wl_surface_attach(surface, buffer, 0, 0);
 }
 
 static void handle_xdg_buffer_configure(void *data, struct xdg_surface *xdg_surface,
                                         uint32_t serial) {
-    fprintf(stderr, "configuring xdg surface\n");
-    if (lol) {
-        fprintf(stderr, "resizing...\n");
-        /* int32_t width = window_width; */
-        /* int32_t height = window_height; */
-        int stride = window_width * 4;
-        int size = stride * window_height;
-        int fd = create_shm_file(size);
-        /* if (fd < 0) { */
-        /*     fprintf(stderr, "creating a buffer file for %d B failed: %m\n", size); */
-        /*     return 1; */
-        /* } */
-        /* if (shm_data) { */
-        /*     munmap(shm_data, shm_data_len); */
-        /* } */
-        shm_data = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-        /* wl_buffer_destroy(buffer); */
-        pool = wl_shm_create_pool(shm, fd, size);
-        buffer = wl_shm_pool_create_buffer(pool, 0, window_width, window_height, stride,
-                                           WL_SHM_FORMAT_ARGB8888);
-        wl_buffer_add_listener(buffer, &buffer_listener, NULL);
-        /* resize_surface(); */
-        /* wl_surface_commit(surface); */
-        cairo_surface_t *s = cairo_image_surface_create_for_data(
-            shm_data, CAIRO_FORMAT_ARGB32, window_width, window_height, window_width * 4);
-
-        cairo = cairo_create(s);
-
-        /* fprintf(stderr, "clearing rectanglge: %ix%i\n", width, height); */
-
-        /* wl_display_roundtrip(display); */
-        wl_surface_attach(surface, buffer, 0, 0);
-
-        wl_display_roundtrip(display);
-        wl_surface_commit(surface);
-    }
-    lol = true;
+    fprintf(stderr, "configured xdg surface\n");
 
     xdg_surface_ack_configure(xdg_surface, serial);
 }
@@ -333,14 +271,14 @@ static void handle_global(void *data, struct wl_registry *registry, uint32_t nam
 
     fprintf(stderr, "Event %s\n", interface);
     if (strcmp(interface, wl_compositor_interface.name) == 0) {
-        compositor = wl_registry_bind(registry, name, &wl_compositor_interface, 4);
+        compositor = wl_registry_bind(registry, name, &wl_compositor_interface, version);
 
     } else if (strcmp(interface, wl_seat_interface.name) == 0) {
-        seat = wl_registry_bind(registry, name, &wl_seat_interface, 1);
+        seat = wl_registry_bind(registry, name, &wl_seat_interface, version);
         wl_seat_add_listener(seat, &seat_listener, NULL);
 
     } else if (strcmp(interface, wl_shm_interface.name) == 0) {
-        shm = wl_registry_bind(registry, name, &wl_shm_interface, 1);
+        shm = wl_registry_bind(registry, name, &wl_shm_interface, version);
 
     } else if (strcmp(interface, xdg_wm_base_interface.name) == 0) {
         xdg_wm_base = wl_registry_bind(registry, name, &xdg_wm_base_interface, version);
@@ -355,10 +293,7 @@ static const struct wl_registry_listener registry_listener = {
     .global_remove = handle_global_remove,
 };
 
-#define TOCK                                                                             \
-    fprintf(stderr, "%d: %f\n", __LINE__, (double)(current_timestamp() - begin) / 1000);
 int main(int argc, char *argv[]) {
-    begin = current_timestamp();
     fprintf(stderr, "clocks per second: %lu\n", CLOCKS_PER_SEC);
 
     display = wl_display_connect(NULL);
@@ -366,8 +301,6 @@ int main(int argc, char *argv[]) {
     wl_registry_add_listener(registry, &registry_listener, NULL);
 
     wl_display_roundtrip(display);
-
-    /* wl_display_roundtrip(display); */
 
     surface = wl_compositor_create_surface(compositor);
 
@@ -379,26 +312,18 @@ int main(int argc, char *argv[]) {
 
     xdg_toplevel_set_title(xdg_toplevel, "lol");
 
-    /* wl_display_roundtrip(display); */
     wl_surface_commit(surface);
 
     wl_display_roundtrip(display);
-
-    /* here, do your time-consuming job */
     resize_surface();
 
     wl_surface_commit(surface);
 
-    /* wl_display_roundtrip(display); */
-
     running = true;
     while (wl_display_dispatch(display) != -1 && running) {
-        clock_t c2 = clock();
-        fprintf(stderr, "cycle\n");
-        /*     resize_surface(); */
-        /*     wl_surface_attach(surface, buffer, 0, 0); */
-        /* wl_surface_commit(surface); */
-        draw();
+        if (resized) {
+            draw();
+        }
     }
 
     wl_display_disconnect(display);

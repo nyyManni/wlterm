@@ -8,6 +8,7 @@
 #include <unistd.h>
 
 #include <cairo/cairo.h>
+#include <pango/pangocairo.h>
 #include <xkbcommon/xkbcommon.h>
 
 #include <wayland-client-protocol.h>
@@ -16,9 +17,8 @@
 #include "xdg-shell-client-protocol.h"
 #define _POSIX_C_SOURCE 200809L
 
-
-
 bool configured = false;
+static char *font = "Mono";
 
 struct wl_display *display;
 struct wl_seat *seat;
@@ -44,6 +44,81 @@ int window_width = 200;
 int window_height = 200;
 bool resized = true;
 bool running;
+
+static const char overflow[] = "[buffer overflow]";
+static const int max_chars = 16384;
+PangoLayout *get_pango_layout(cairo_t *cairo, const char *font,
+		const char *text, double scale, bool markup) {
+	PangoLayout *layout = pango_cairo_create_layout(cairo);
+	PangoAttrList *attrs;
+	if (markup) {
+		char *buf;
+		GError *error = NULL;
+		if (pango_parse_markup(text, -1, 0, &attrs, &buf, NULL, &error)) {
+			pango_layout_set_text(layout, buf, -1);
+			free(buf);
+		} else {
+			/* wlr_log(WLR_ERROR, "pango_parse_markup '%s' -> error %s", text, */
+			/* 		error->message); */
+			g_error_free(error);
+			markup = false; // fallback to plain text
+		}
+	}
+	if (!markup) {
+		attrs = pango_attr_list_new();
+		pango_layout_set_text(layout, text, -1);
+	}
+
+	pango_attr_list_insert(attrs, pango_attr_scale_new(scale));
+	PangoFontDescription *desc = pango_font_description_from_string(font);
+	pango_layout_set_font_description(layout, desc);
+	pango_layout_set_single_paragraph_mode(layout, 1);
+	pango_layout_set_attributes(layout, attrs);
+	pango_attr_list_unref(attrs);
+	pango_font_description_free(desc);
+	return layout;
+}
+
+void get_text_size(cairo_t *cairo, const char *font, int *width, int *height,
+		int *baseline, double scale, bool markup, const char *fmt, ...) {
+	char buf[max_chars];
+
+	va_list args;
+	va_start(args, fmt);
+	if (vsnprintf(buf, sizeof(buf), fmt, args) >= max_chars) {
+		strcpy(&buf[sizeof(buf) - sizeof(overflow)], overflow);
+	}
+	va_end(args);
+
+	PangoLayout *layout = get_pango_layout(cairo, font, buf, scale, markup);
+	pango_cairo_update_layout(cairo, layout);
+	pango_layout_get_pixel_size(layout, width, height);
+	if (baseline) {
+		*baseline = pango_layout_get_baseline(layout) / PANGO_SCALE;
+	}
+	g_object_unref(layout);
+}
+
+void pango_printf(cairo_t *cairo, const char *font,
+		double scale, bool markup, const char *fmt, ...) {
+	char buf[max_chars];
+
+	va_list args;
+	va_start(args, fmt);
+	if (vsnprintf(buf, sizeof(buf), fmt, args) >= max_chars) {
+		strcpy(&buf[sizeof(buf) - sizeof(overflow)], overflow);
+	}
+	va_end(args);
+
+	PangoLayout *layout = get_pango_layout(cairo, font, buf, scale, markup);
+	cairo_font_options_t *fo = cairo_font_options_create();
+	cairo_get_font_options(cairo, fo);
+	pango_cairo_context_set_font_options(pango_layout_get_context(layout), fo);
+	cairo_font_options_destroy(fo);
+	pango_cairo_update_layout(cairo, layout);
+	pango_cairo_show_layout(cairo, layout);
+	g_object_unref(layout);
+}
 
 void cairo_set_source_u32(cairo_t *cairo, uint32_t color) {
     cairo_set_source_rgba(
@@ -217,7 +292,6 @@ static void handle_ping(void *data, struct xdg_wm_base *xdg_wm_base, uint32_t se
 
 static const struct xdg_wm_base_listener xdg_base_listener = {.ping = handle_ping};
 
-
 void draw() {
     cairo_set_source_u32(cairo, 0x0);
     cairo_rectangle(cairo, 0, 0, window_width, window_height);
@@ -233,6 +307,10 @@ void draw() {
     cairo_line_to(cairo, 100, window_height - 100);
     cairo_close_path(cairo);
     cairo_fill(cairo);
+
+    cairo_set_source_u32(cairo, 0xffffffff);
+    cairo_move_to(cairo, 150, 150);
+    pango_printf(cairo, font, 2, false, "emacs");
 }
 
 static void resize_surface() {
@@ -259,7 +337,6 @@ static void resize_surface() {
 static void handle_xdg_buffer_configure(void *data, struct xdg_surface *xdg_surface,
                                         uint32_t serial) {
     fprintf(stderr, "configured xdg surface\n");
-
     xdg_surface_ack_configure(xdg_surface, serial);
 }
 

@@ -17,6 +17,8 @@
 #include "xdg-shell-client-protocol.h"
 #define _POSIX_C_SOURCE 200809L
 
+static int counter = 0;
+
 
 struct wl_display *g_display;
 struct wl_compositor *g_compositor;
@@ -24,15 +26,16 @@ struct wl_seat *g_seat;
 struct xkb_keymap *g_xkb_keymap;
 struct wl_keyboard *g_kbd;
 struct xdg_wm_base *g_xdg_wm_base;
+struct wl_shm *g_shm;
 
 struct window {
+
     struct wl_surface *surface;
     struct xdg_surface *xdg_surface;
     struct xdg_toplevel *xdg_toplevel;
 
     struct wl_buffer *buffer;
     void *shm_data;
-    /* struct wl_shm *shm; */
 
     cairo_t *cairo;
 
@@ -46,31 +49,17 @@ struct window {
 bool configured = false;
 static char *font = "Mono";
 
-struct wl_display *display;
 struct wl_seat *seat;
-struct wl_compositor *compositor;
-struct wl_shm *shm;
 struct wl_keyboard *kbd;
 struct xkb_keymap *xkb_keymap;
 struct xkb_context *xkb_context;
 struct xkb_state *xkb_state;
-/* struct xdg_surface *xdg_surface; */
-/* struct xdg_toplevel *xdg_toplevel; */
 struct xdg_wm_base *xdg_wm_base;
-/* struct wl_shm_pool *pool; */
-/* struct wl_buffer *buffer; */
 int scale = 2;
 
-/* cairo_t *cairo; */
-/* struct wl_buffer *buffer; */
-/* struct wl_surface *surface; */
-/* void *shm_data = NULL; */
-size_t shm_data_len;
 
-/* int window_width = 200; */
-/* int window_height = 200; */
-/* bool resized = true; */
 bool running;
+void draw(struct window *);
 
 static const char overflow[] = "[buffer overflow]";
 static const int max_chars = 16384;
@@ -192,7 +181,6 @@ int create_shm_file(off_t size) {
         close(fd);
         return -1;
     }
-    shm_data_len = size;
 
     return fd;
 }
@@ -219,6 +207,7 @@ static void keyboard_keymap(void *data, struct wl_keyboard *wl_keyboard, uint32_
 
     xkb_state = xkb_state_new(xkb_keymap);
 }
+struct window *active_window;
 
 static void keyboard_enter(void *data, struct wl_keyboard *wl_keyboard, uint32_t serial,
                            struct wl_surface *surface, struct wl_array *keys) {
@@ -238,9 +227,11 @@ static void keyboard_modifiers(void *data, struct wl_keyboard *keyboard, uint32_
 
 static void keyboard_key(void *data, struct wl_keyboard *wl_keyboard, uint32_t serial,
                          uint32_t time, uint32_t key, uint32_t _key_state) {
+    /* struct window *w = data; */
     enum wl_keyboard_key_state key_state = _key_state;
     xkb_keysym_t sym = xkb_state_key_get_one_sym(xkb_state, key + 8);
     fprintf(stderr, "handling keyinput\n");
+    /* draw(active_window); */
 }
 
 static const struct wl_keyboard_listener keyboard_listener = {
@@ -254,10 +245,10 @@ static const struct wl_keyboard_listener keyboard_listener = {
 
 static void seat_handle_capabilities(void *data, struct wl_seat *wl_seat,
                                      enum wl_seat_capability caps) {
-    struct dmenu_panel *panel = data;
+    struct window *w = data;
     if (caps & WL_SEAT_CAPABILITY_KEYBOARD) {
         kbd = wl_seat_get_keyboard(seat);
-        wl_keyboard_add_listener(kbd, &keyboard_listener, panel);
+        wl_keyboard_add_listener(kbd, &keyboard_listener, NULL);
     }
 }
 static void seat_handle_name(void *data, struct wl_seat *wl_seat, const char *name) {
@@ -268,7 +259,9 @@ const struct wl_seat_listener seat_listener = {
     .capabilities = seat_handle_capabilities,
     .name = seat_handle_name,
 };
-static void buffer_release(void *data, struct wl_buffer *wl_buffer) {}
+static void buffer_release(void *data, struct wl_buffer *wl_buffer) {
+    fprintf(stderr, "released buffer\n");
+}
 
 static const struct wl_buffer_listener buffer_listener = {.release = buffer_release};
 
@@ -287,7 +280,7 @@ static void handle_toplevel_configure(void *data, struct xdg_toplevel *toplevel,
     fprintf(stderr, "width: %i, height: %i\n", w->width, w->height);
     if (w->configured) {
         resize_surface(w);
-        wl_display_roundtrip(display);
+        /* wl_display_roundtrip(g_display); */
         wl_surface_commit(w->surface);
     }
     w->configured = true;
@@ -308,7 +301,20 @@ static void handle_ping(void *data, struct xdg_wm_base *xdg_wm_base, uint32_t se
 
 static const struct xdg_wm_base_listener xdg_base_listener = {.ping = handle_ping};
 
+
+static void frame_handle_done(void *data, struct wl_callback *callback,
+		uint32_t time) {
+    struct window *w = data;
+	wl_callback_destroy(callback);
+	draw(w);
+}
+
+const struct wl_callback_listener frame_listener = {
+	.done = frame_handle_done,
+};
+
 void draw(struct window * w) {
+    fprintf(stderr, "drawing...\n");
     cairo_t *cairo = w->cairo;
     cairo_move_to(cairo, 0, 0);
     cairo_set_source_u32(cairo, 0x0);
@@ -328,17 +334,29 @@ void draw(struct window * w) {
 
     cairo_set_source_u32(cairo, 0xffffffff);
     cairo_move_to(cairo, 250, 250);
-    pango_printf(cairo, font, scale, false, "emacs");
+    pango_printf(cairo, font, scale, false, "emacs %d", ++counter);
+
+    wl_surface_damage(w->surface, 0, 0, w->width, w->height);
+    wl_surface_attach(w->surface, w->buffer, 0, 0);
+    wl_surface_commit(w->surface);
+    /* memset(w->shm_data, 0xff, w->width * 4 * w->height * scale * scale); */
+
+    /* if (cb) { */
+        struct wl_callback *callback = wl_surface_frame(w->surface);
+        wl_callback_add_listener(callback, &frame_listener, w);
+    /* } */
 }
 
 static void resize_surface(struct window *window) {
+    if (!window->resized) return;
     fprintf(stderr, "resizing surface\n");
     int stride = window->width * 4;
     int size = stride * window->height;
 
     int fd = create_shm_file(size * scale * scale);
     window->shm_data = mmap(NULL, size * scale * scale, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-    struct wl_shm_pool *pool = wl_shm_create_pool(shm, fd, size * scale * scale);
+    /* memset(window->shm_data, 0xff, size * scale * scale); */
+    struct wl_shm_pool *pool = wl_shm_create_pool(g_shm, fd, size * scale * scale);
     window->buffer = wl_shm_pool_create_buffer(pool, 0, window->width * scale,
                                        window->height * scale, stride * scale,
                                        WL_SHM_FORMAT_ARGB8888);
@@ -355,6 +373,7 @@ static void resize_surface(struct window *window) {
     wl_surface_attach(window->surface, window->buffer, 0, 0);
 }
 
+
 static void handle_xdg_buffer_configure(void *data, struct xdg_surface *xdg_surface,
                                         uint32_t serial) {
     struct window *w = data;
@@ -368,16 +387,15 @@ static struct xdg_surface_listener xdg_surface_listener = {
 static void handle_global(void *data, struct wl_registry *registry, uint32_t name,
                           const char *interface, uint32_t version) {
 
-    fprintf(stderr, "Event %s\n", interface);
     if (strcmp(interface, wl_compositor_interface.name) == 0) {
-        compositor = wl_registry_bind(registry, name, &wl_compositor_interface, version);
+        g_compositor = wl_registry_bind(registry, name, &wl_compositor_interface, version);
 
     } else if (strcmp(interface, wl_seat_interface.name) == 0) {
         seat = wl_registry_bind(registry, name, &wl_seat_interface, version);
         wl_seat_add_listener(seat, &seat_listener, NULL);
 
     } else if (strcmp(interface, wl_shm_interface.name) == 0) {
-        shm = wl_registry_bind(registry, name, &wl_shm_interface, version);
+        g_shm = wl_registry_bind(registry, name, &wl_shm_interface, version);
 
     } else if (strcmp(interface, xdg_wm_base_interface.name) == 0) {
         xdg_wm_base = wl_registry_bind(registry, name, &xdg_wm_base_interface, version);
@@ -399,7 +417,7 @@ struct window *create_window() {
     w->height = 200;
     w->resized = true;
 
-    w->surface = wl_compositor_create_surface(compositor);
+    w->surface = wl_compositor_create_surface(g_compositor);
 	wl_surface_set_buffer_scale(w->surface, scale);
 
     w->xdg_surface = xdg_wm_base_get_xdg_surface(xdg_wm_base, w->surface);
@@ -411,38 +429,43 @@ struct window *create_window() {
     xdg_toplevel_set_title(w->xdg_toplevel, "lol");
     wl_surface_commit(w->surface);
 
-    wl_display_roundtrip(display);
+    wl_display_roundtrip(g_display);
     resize_surface(w);
+    struct wl_callback *callback = wl_surface_frame(w->surface);
+	wl_callback_add_listener(callback, &frame_listener, w);
 
     wl_surface_commit(w->surface);
 
     return w;
 }
 
+void close_window(struct window* w) {
+
+    wl_surface_destroy(w->surface);
+}
+
 
 int main(int argc, char *argv[]) {
-    fprintf(stderr, "clocks per second: %lu\n", CLOCKS_PER_SEC);
-
-    display = wl_display_connect(NULL);
-    struct wl_registry *registry = wl_display_get_registry(display);
+    g_display = wl_display_connect(NULL);
+    struct wl_registry *registry = wl_display_get_registry(g_display);
     wl_registry_add_listener(registry, &registry_listener, NULL);
 
-    wl_display_roundtrip(display);
+    wl_display_roundtrip(g_display);
 
     struct window *w = create_window();
+    active_window = w;
     struct window *w2 = create_window();
 
     running = true;
-    while (wl_display_dispatch(display) != -1 && running) {
-        if (w->resized) {
-            draw(w);
-        }
-        if (w2->resized) {
-            draw(w2);
-        }
+    /* wl_display_dispatch(g_display); */
+    while (wl_display_dispatch(g_display) != -1 && running) {
+    /* draw(w); */
+        /* /\* if (w2->resized) { *\/ */
+            /* draw(w); */
+        /* } */
     }
 
-    wl_display_disconnect(display);
+    wl_display_disconnect(g_display);
 
     return 0;
 }

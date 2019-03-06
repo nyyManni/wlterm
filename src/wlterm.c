@@ -19,7 +19,6 @@
 
 static int counter = 0;
 
-
 struct wl_display *g_display;
 struct wl_compositor *g_compositor;
 struct wl_seat *g_seat;
@@ -39,6 +38,7 @@ struct window {
 
     cairo_t *cairo;
 
+    bool open;
     int width;
     int height;
 
@@ -57,83 +57,82 @@ struct xkb_state *xkb_state;
 struct xdg_wm_base *xdg_wm_base;
 int scale = 2;
 
-
 bool running;
 void draw(struct window *);
 
 static const char overflow[] = "[buffer overflow]";
 static const int max_chars = 16384;
-PangoLayout *get_pango_layout(cairo_t *cairo, const char *font,
-		const char *text, double scale, bool markup) {
-	PangoLayout *layout = pango_cairo_create_layout(cairo);
-	PangoAttrList *attrs;
-	if (markup) {
-		char *buf;
-		GError *error = NULL;
-		if (pango_parse_markup(text, -1, 0, &attrs, &buf, NULL, &error)) {
-			pango_layout_set_text(layout, buf, -1);
-			free(buf);
-		} else {
-			/* wlr_log(WLR_ERROR, "pango_parse_markup '%s' -> error %s", text, */
-			/* 		error->message); */
-			g_error_free(error);
-			markup = false; // fallback to plain text
-		}
-	}
-	if (!markup) {
-		attrs = pango_attr_list_new();
-		pango_layout_set_text(layout, text, -1);
-	}
+PangoLayout *get_pango_layout(cairo_t *cairo, const char *font, const char *text,
+                              double scale, bool markup) {
+    PangoLayout *layout = pango_cairo_create_layout(cairo);
+    PangoAttrList *attrs;
+    if (markup) {
+        char *buf;
+        GError *error = NULL;
+        if (pango_parse_markup(text, -1, 0, &attrs, &buf, NULL, &error)) {
+            pango_layout_set_text(layout, buf, -1);
+            free(buf);
+        } else {
+            /* wlr_log(WLR_ERROR, "pango_parse_markup '%s' -> error %s", text, */
+            /* 		error->message); */
+            g_error_free(error);
+            markup = false; // fallback to plain text
+        }
+    }
+    if (!markup) {
+        attrs = pango_attr_list_new();
+        pango_layout_set_text(layout, text, -1);
+    }
 
-	pango_attr_list_insert(attrs, pango_attr_scale_new(scale));
-	PangoFontDescription *desc = pango_font_description_from_string(font);
-	pango_layout_set_font_description(layout, desc);
-	pango_layout_set_single_paragraph_mode(layout, 1);
-	pango_layout_set_attributes(layout, attrs);
-	pango_attr_list_unref(attrs);
-	pango_font_description_free(desc);
-	return layout;
+    pango_attr_list_insert(attrs, pango_attr_scale_new(scale));
+    PangoFontDescription *desc = pango_font_description_from_string(font);
+    pango_layout_set_font_description(layout, desc);
+    pango_layout_set_single_paragraph_mode(layout, 1);
+    pango_layout_set_attributes(layout, attrs);
+    pango_attr_list_unref(attrs);
+    pango_font_description_free(desc);
+    return layout;
 }
 
 void get_text_size(cairo_t *cairo, const char *font, int *width, int *height,
-		int *baseline, double scale, bool markup, const char *fmt, ...) {
-	char buf[max_chars];
+                   int *baseline, double scale, bool markup, const char *fmt, ...) {
+    char buf[max_chars];
 
-	va_list args;
-	va_start(args, fmt);
-	if (vsnprintf(buf, sizeof(buf), fmt, args) >= max_chars) {
-		strcpy(&buf[sizeof(buf) - sizeof(overflow)], overflow);
-	}
-	va_end(args);
+    va_list args;
+    va_start(args, fmt);
+    if (vsnprintf(buf, sizeof(buf), fmt, args) >= max_chars) {
+        strcpy(&buf[sizeof(buf) - sizeof(overflow)], overflow);
+    }
+    va_end(args);
 
-	PangoLayout *layout = get_pango_layout(cairo, font, buf, scale, markup);
-	pango_cairo_update_layout(cairo, layout);
-	pango_layout_get_pixel_size(layout, width, height);
-	if (baseline) {
-		*baseline = pango_layout_get_baseline(layout) / PANGO_SCALE;
-	}
-	g_object_unref(layout);
+    PangoLayout *layout = get_pango_layout(cairo, font, buf, scale, markup);
+    pango_cairo_update_layout(cairo, layout);
+    pango_layout_get_pixel_size(layout, width, height);
+    if (baseline) {
+        *baseline = pango_layout_get_baseline(layout) / PANGO_SCALE;
+    }
+    g_object_unref(layout);
 }
 
-void pango_printf(cairo_t *cairo, const char *font,
-		double scale, bool markup, const char *fmt, ...) {
-	char buf[max_chars];
+void pango_printf(cairo_t *cairo, const char *font, double scale, bool markup,
+                  const char *fmt, ...) {
+    char buf[max_chars];
 
-	va_list args;
-	va_start(args, fmt);
-	if (vsnprintf(buf, sizeof(buf), fmt, args) >= max_chars) {
-		strcpy(&buf[sizeof(buf) - sizeof(overflow)], overflow);
-	}
-	va_end(args);
+    va_list args;
+    va_start(args, fmt);
+    if (vsnprintf(buf, sizeof(buf), fmt, args) >= max_chars) {
+        strcpy(&buf[sizeof(buf) - sizeof(overflow)], overflow);
+    }
+    va_end(args);
 
-	PangoLayout *layout = get_pango_layout(cairo, font, buf, scale, markup);
-	cairo_font_options_t *fo = cairo_font_options_create();
-	cairo_get_font_options(cairo, fo);
-	pango_cairo_context_set_font_options(pango_layout_get_context(layout), fo);
-	cairo_font_options_destroy(fo);
-	pango_cairo_update_layout(cairo, layout);
-	pango_cairo_show_layout(cairo, layout);
-	g_object_unref(layout);
+    PangoLayout *layout = get_pango_layout(cairo, font, buf, scale, markup);
+    cairo_font_options_t *fo = cairo_font_options_create();
+    cairo_get_font_options(cairo, fo);
+    pango_cairo_context_set_font_options(pango_layout_get_context(layout), fo);
+    cairo_font_options_destroy(fo);
+    pango_cairo_update_layout(cairo, layout);
+    pango_cairo_show_layout(cairo, layout);
+    g_object_unref(layout);
 }
 
 void cairo_set_source_u32(cairo_t *cairo, uint32_t color) {
@@ -207,10 +206,16 @@ static void keyboard_keymap(void *data, struct wl_keyboard *wl_keyboard, uint32_
 
     xkb_state = xkb_state_new(xkb_keymap);
 }
+
 struct window *active_window;
+#define MAX_WINDOWS 64
+struct window *windows[MAX_WINDOWS];
+int open_windows = 0;
 
 static void keyboard_enter(void *data, struct wl_keyboard *wl_keyboard, uint32_t serial,
                            struct wl_surface *surface, struct wl_array *keys) {
+
+    active_window = wl_surface_get_user_data(surface);
     // Who cares
 }
 
@@ -225,12 +230,23 @@ static void keyboard_modifiers(void *data, struct wl_keyboard *keyboard, uint32_
                                uint32_t mods_depressed, uint32_t mods_latched,
                                uint32_t mods_locked, uint32_t group) {}
 
+void close_window(struct window *w);
+struct window *create_window();
+
 static void keyboard_key(void *data, struct wl_keyboard *wl_keyboard, uint32_t serial,
                          uint32_t time, uint32_t key, uint32_t _key_state) {
     /* struct window *w = data; */
     enum wl_keyboard_key_state key_state = _key_state;
     xkb_keysym_t sym = xkb_state_key_get_one_sym(xkb_state, key + 8);
     fprintf(stderr, "handling keyinput\n");
+
+    if (key_state != WL_KEYBOARD_KEY_STATE_PRESSED)
+        return;
+    if (sym == XKB_KEY_c) {
+        close_window(active_window);
+    } else if (sym == XKB_KEY_n) {
+        create_window();
+    }
     /* draw(active_window); */
 }
 
@@ -280,14 +296,15 @@ static void handle_toplevel_configure(void *data, struct xdg_toplevel *toplevel,
     fprintf(stderr, "width: %i, height: %i\n", w->width, w->height);
     if (w->configured) {
         resize_surface(w);
-        /* wl_display_roundtrip(g_display); */
         wl_surface_commit(w->surface);
     }
     w->configured = true;
 }
 
 static void handle_toplevel_close(void *data, struct xdg_toplevel *xdg_toplevel) {
-    running = 0;
+    fprintf(stderr, "closing window\n");
+    struct window *w = data;
+    w->open = false;
 }
 
 static const struct xdg_toplevel_listener xdg_toplevel_listener = {
@@ -301,19 +318,19 @@ static void handle_ping(void *data, struct xdg_wm_base *xdg_wm_base, uint32_t se
 
 static const struct xdg_wm_base_listener xdg_base_listener = {.ping = handle_ping};
 
-
-static void frame_handle_done(void *data, struct wl_callback *callback,
-		uint32_t time) {
+static void frame_handle_done(void *data, struct wl_callback *callback, uint32_t time) {
     struct window *w = data;
-	wl_callback_destroy(callback);
-	draw(w);
+    wl_callback_destroy(callback);
+    draw(w);
 }
 
 const struct wl_callback_listener frame_listener = {
-	.done = frame_handle_done,
+    .done = frame_handle_done,
 };
 
-void draw(struct window * w) {
+void draw(struct window *w) {
+    if (!w->open)
+        return;
     fprintf(stderr, "drawing...\n");
     cairo_t *cairo = w->cairo;
     cairo_move_to(cairo, 0, 0);
@@ -336,43 +353,50 @@ void draw(struct window * w) {
     cairo_move_to(cairo, 250, 250);
     pango_printf(cairo, font, scale, false, "emacs %d", ++counter);
 
+    if (w == active_window) {
+        cairo_move_to(cairo, 250, 350);
+        pango_printf(cairo, font, scale, false, "active");
+    }
+
     wl_surface_damage(w->surface, 0, 0, w->width, w->height);
     wl_surface_attach(w->surface, w->buffer, 0, 0);
     wl_surface_commit(w->surface);
     /* memset(w->shm_data, 0xff, w->width * 4 * w->height * scale * scale); */
 
     /* if (cb) { */
-        struct wl_callback *callback = wl_surface_frame(w->surface);
-        wl_callback_add_listener(callback, &frame_listener, w);
+    struct wl_callback *callback = wl_surface_frame(w->surface);
+    wl_callback_add_listener(callback, &frame_listener, w);
     /* } */
 }
 
 static void resize_surface(struct window *window) {
-    if (!window->resized) return;
+    if (!window->open)
+        return;
+    if (!window->resized)
+        return;
     fprintf(stderr, "resizing surface\n");
     int stride = window->width * 4;
     int size = stride * window->height;
 
     int fd = create_shm_file(size * scale * scale);
-    window->shm_data = mmap(NULL, size * scale * scale, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    window->shm_data =
+        mmap(NULL, size * scale * scale, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     /* memset(window->shm_data, 0xff, size * scale * scale); */
     struct wl_shm_pool *pool = wl_shm_create_pool(g_shm, fd, size * scale * scale);
-    window->buffer = wl_shm_pool_create_buffer(pool, 0, window->width * scale,
-                                       window->height * scale, stride * scale,
-                                       WL_SHM_FORMAT_ARGB8888);
+    window->buffer =
+        wl_shm_pool_create_buffer(pool, 0, window->width * scale, window->height * scale,
+                                  stride * scale, WL_SHM_FORMAT_ARGB8888);
 
     wl_buffer_add_listener(window->buffer, &buffer_listener, NULL);
 
     cairo_surface_t *s = cairo_image_surface_create_for_data(
-        window->shm_data, CAIRO_FORMAT_ARGB32,
-        window->width *scale, window->height * scale,
-        window->width * 4 * scale);
+        window->shm_data, CAIRO_FORMAT_ARGB32, window->width * scale,
+        window->height * scale, window->width * 4 * scale);
 
     window->cairo = cairo_create(s);
 
     wl_surface_attach(window->surface, window->buffer, 0, 0);
 }
-
 
 static void handle_xdg_buffer_configure(void *data, struct xdg_surface *xdg_surface,
                                         uint32_t serial) {
@@ -388,7 +412,8 @@ static void handle_global(void *data, struct wl_registry *registry, uint32_t nam
                           const char *interface, uint32_t version) {
 
     if (strcmp(interface, wl_compositor_interface.name) == 0) {
-        g_compositor = wl_registry_bind(registry, name, &wl_compositor_interface, version);
+        g_compositor =
+            wl_registry_bind(registry, name, &wl_compositor_interface, version);
 
     } else if (strcmp(interface, wl_seat_interface.name) == 0) {
         seat = wl_registry_bind(registry, name, &wl_seat_interface, version);
@@ -411,14 +436,20 @@ static const struct wl_registry_listener registry_listener = {
 };
 
 struct window *create_window() {
-    struct window *w = malloc(sizeof(struct window));
+    struct window **wp = &windows[0];
+    while (*wp++)
+        ;
+    struct window *w = *wp = malloc(sizeof(struct window));
+
     w->configured = false;
     w->width = 200;
     w->height = 200;
     w->resized = true;
+    w->open = true;
 
     w->surface = wl_compositor_create_surface(g_compositor);
-	wl_surface_set_buffer_scale(w->surface, scale);
+    wl_surface_set_user_data(w->surface, w);
+    wl_surface_set_buffer_scale(w->surface, scale);
 
     w->xdg_surface = xdg_wm_base_get_xdg_surface(xdg_wm_base, w->surface);
     w->xdg_toplevel = xdg_surface_get_toplevel(w->xdg_surface);
@@ -428,24 +459,37 @@ struct window *create_window() {
 
     xdg_toplevel_set_title(w->xdg_toplevel, "lol");
     wl_surface_commit(w->surface);
-
     wl_display_roundtrip(g_display);
     resize_surface(w);
     struct wl_callback *callback = wl_surface_frame(w->surface);
-	wl_callback_add_listener(callback, &frame_listener, w);
+    wl_callback_add_listener(callback, &frame_listener, w);
 
     wl_surface_commit(w->surface);
 
+    open_windows++;
     return w;
 }
 
-void close_window(struct window* w) {
+void close_window(struct window *w) {
+    w->open = false;
 
+    xdg_toplevel_destroy(w->xdg_toplevel);
+    xdg_surface_destroy(w->xdg_surface);
     wl_surface_destroy(w->surface);
+    wl_buffer_destroy(w->buffer);
+
+    struct window **wp = &windows[0];
+    while (*wp != w)
+        wp++;
+    free(w);
+    *wp = NULL;
+
+    open_windows--;
 }
 
-
 int main(int argc, char *argv[]) {
+    memset(windows, 0, MAX_WINDOWS * sizeof(struct window *));
+
     g_display = wl_display_connect(NULL);
     struct wl_registry *registry = wl_display_get_registry(g_display);
     wl_registry_add_listener(registry, &registry_listener, NULL);
@@ -453,16 +497,9 @@ int main(int argc, char *argv[]) {
     wl_display_roundtrip(g_display);
 
     struct window *w = create_window();
-    active_window = w;
-    struct window *w2 = create_window();
 
     running = true;
-    /* wl_display_dispatch(g_display); */
-    while (wl_display_dispatch(g_display) != -1 && running) {
-    /* draw(w); */
-        /* /\* if (w2->resized) { *\/ */
-            /* draw(w); */
-        /* } */
+    while (wl_display_dispatch(g_display) != -1 && open_windows) {
     }
 
     wl_display_disconnect(g_display);

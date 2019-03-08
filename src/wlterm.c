@@ -15,7 +15,6 @@
 #include <wayland-client.h>
 
 #include "xdg-shell-client-protocol.h"
-#define _POSIX_C_SOURCE 200809L
 
 static int counter = 0;
 
@@ -23,7 +22,9 @@ struct wl_display *g_display;
 struct wl_compositor *g_compositor;
 struct wl_seat *g_seat;
 struct xkb_keymap *g_xkb_keymap;
+struct xkb_state *g_xkb_state;
 struct wl_keyboard *g_kbd;
+struct wl_pointer *g_pointer;
 struct xdg_wm_base *g_xdg_wm_base;
 struct wl_shm *g_shm;
 
@@ -44,21 +45,25 @@ struct window {
 
     bool resized;
     bool configured;
+    double position[2];
+    double __position_pending[2];
 };
+
+/* int32_t scroll[2]; */
+/* uint32_t scroll_time[2]; */
 
 bool configured = false;
 static char *font = "Mono";
 
-struct wl_seat *seat;
-struct wl_keyboard *kbd;
-struct xkb_keymap *xkb_keymap;
-struct xkb_context *xkb_context;
-struct xkb_state *xkb_state;
-struct xdg_wm_base *xdg_wm_base;
 int scale = 2;
 
 bool running;
 void draw(struct window *);
+
+struct window *active_window;
+#define MAX_WINDOWS 64
+struct window *windows[MAX_WINDOWS];
+int open_windows = 0;
 
 static const char overflow[] = "[buffer overflow]";
 static const int max_chars = 16384;
@@ -184,11 +189,154 @@ int create_shm_file(off_t size) {
     return fd;
 }
 
+static void pointer_handle_enter(void *data, struct wl_pointer *pointer, uint32_t serial,
+                                 struct wl_surface *surface, wl_fixed_t sx,
+                                 wl_fixed_t sy) {
+    /* struct display *display = data; */
+    /* struct wl_buffer *buffer; */
+    /* struct wl_cursor *cursor = display->default_cursor; */
+    /* struct wl_cursor_image *image; */
+
+    /* if (display->window->fullscreen) */
+    /* 	wl_pointer_set_cursor(pointer, serial, NULL, 0, 0); */
+    /* else if (cursor) { */
+    /* 	image = display->default_cursor->images[0]; */
+    /* 	buffer = wl_cursor_image_get_buffer(image); */
+    /* 	if (!buffer) */
+    /* 		return; */
+    /* 	wl_pointer_set_cursor(pointer, serial, */
+    /* 			      display->cursor_surface, */
+    /* 			      image->hotspot_x, */
+    /* 			      image->hotspot_y); */
+    /* 	wl_surface_attach(display->cursor_surface, buffer, 0, 0); */
+    /* 	wl_surface_damage(display->cursor_surface, 0, 0, */
+    /* 			  image->width, image->height); */
+    /* 	wl_surface_commit(display->cursor_surface); */
+    /* } */
+}
+
+static void pointer_handle_leave(void *data, struct wl_pointer *pointer, uint32_t serial,
+                                 struct wl_surface *surface) {
+}
+
+static void pointer_handle_motion(void *data, struct wl_pointer *pointer, uint32_t time,
+                                  wl_fixed_t sx, wl_fixed_t sy) {
+
+    fprintf(stderr, "axis motion\n");
+}
+
+static void pointer_handle_button(void *data, struct wl_pointer *wl_pointer,
+                                  uint32_t serial, uint32_t time, uint32_t button,
+                                  uint32_t state) {
+    /* struct display *display = data; */
+
+    /* if (!display->window->xdg_toplevel) */
+    /*     return; */
+
+    /* if (button == BTN_LEFT && state == WL_POINTER_BUTTON_STATE_PRESSED) */
+    /*     zxdg_toplevel_v6_move(display->window->xdg_toplevel, display->seat, serial); */
+}
+
+static void pointer_handle_axis(void *data, struct wl_pointer *wl_pointer, uint32_t time,
+                                uint32_t axis, wl_fixed_t value) {
+
+    uint32_t other_axis = !axis;
+
+    /* static uint32_t a = 999; */
+    /* if (a == axis) { */
+    /*     scroll[0] = 0; */
+    /*     scroll[1] = 0; */
+    /* } */
+
+    active_window->__position_pending[axis] -= value / 100.0;
+    /* fprintf(stderr, "scroll scroll scroll\n"); */
+
+
+    /* Trigger a throttled redraw */
+}
+
+static void pointer_handle_frame(void *data, struct wl_pointer *wl_pointer) {
+
+    if (fabs (active_window->__position_pending[0]) < 0.0001 &&
+        fabs (active_window->__position_pending[1]) < 0.0001) return;
+
+    for (uint32_t axis = 0; axis < 2; ++axis) {
+        active_window->position[axis] += active_window->__position_pending[axis];
+
+        while (active_window->position[axis] < 0)
+            active_window->position[axis] += 800;
+        while (active_window->position[axis] > 800)
+            active_window->position[axis] -= 800;
+
+        /* a = axis; */
+        /* scroll[axis] = value; */
+
+        active_window->__position_pending[axis] = 0;
+        /* active_window->__position_pending[1] = 0; */
+    }
+
+    /* fprintf(stderr, "scroll frame\n"); */
+    wl_surface_commit(active_window->surface);
+}
+
+static void pointer_handle_axis_source(void *data, struct wl_pointer *wl_pointer,
+                                       uint32_t axis_source) {
+    fprintf(stderr, "axis source\n");
+
+}
+static void pointer_handle_axis_stop(void *data, struct wl_pointer *wl_pointer,
+                                     uint32_t time, uint32_t axis) {
+    fprintf(stderr, "axis stop\n");
+}
+static void pointer_handle_axis_discrete(void *data, struct wl_pointer *wl_pointer,
+                                         uint32_t axis, int32_t discrete) {
+    /* fprintf(stderr, "axis discrete\n"); */
+}
+
+static const struct wl_pointer_listener pointer_listener = {
+    .enter = pointer_handle_enter,
+    .leave = pointer_handle_leave,
+    .motion = pointer_handle_motion,
+    .button = pointer_handle_button,
+    .axis = pointer_handle_axis,
+    .frame = pointer_handle_frame,
+    .axis_source = pointer_handle_axis_source,
+    .axis_stop = pointer_handle_axis_stop,
+    .axis_discrete = pointer_handle_axis_discrete,
+};
+
+static void touch_handle_down(void *data, struct wl_touch *wl_touch, uint32_t serial,
+                              uint32_t time, struct wl_surface *surface, int32_t id,
+                              wl_fixed_t x_w, wl_fixed_t y_w) {
+    /* fprintf(stderr, "touch down\n"); */
+    /* struct display *d = (struct display *)data; */
+
+    /* if (!d->shell) */
+    /*     return; */
+
+    /* zxdg_toplevel_v6_move(d->window->xdg_toplevel, d->seat, serial); */
+}
+
+static void touch_handle_up(void *data, struct wl_touch *wl_touch, uint32_t serial,
+                            uint32_t time, int32_t id) {}
+
+static void touch_handle_motion(void *data, struct wl_touch *wl_touch, uint32_t time,
+                                int32_t id, wl_fixed_t x_w, wl_fixed_t y_w) {}
+
+static void touch_handle_frame(void *data, struct wl_touch *wl_touch) {}
+
+static void touch_handle_cancel(void *data, struct wl_touch *wl_touch) {}
+
+static const struct wl_touch_listener touch_listener = {
+    touch_handle_down,  touch_handle_up,     touch_handle_motion,
+    touch_handle_frame, touch_handle_cancel,
+};
+
 static void keyboard_keymap(void *data, struct wl_keyboard *wl_keyboard, uint32_t format,
                             int32_t fd, uint32_t size) {
 
-    fprintf(stderr, "handling keymap\n");
-    xkb_context = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
+    /* fprintf(stderr, "handling keymap\n"); */
+    struct xkb_context *xkb_context = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
 
     if (format != WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1) {
         close(fd);
@@ -199,18 +347,13 @@ static void keyboard_keymap(void *data, struct wl_keyboard *wl_keyboard, uint32_
         close(fd);
         exit(1);
     }
-    xkb_keymap =
+    struct xkb_keymap *xkb_keymap =
         xkb_keymap_new_from_string(xkb_context, map_shm, XKB_KEYMAP_FORMAT_TEXT_V1, 0);
     munmap(map_shm, size);
     close(fd);
 
-    xkb_state = xkb_state_new(xkb_keymap);
+    g_xkb_state = xkb_state_new(xkb_keymap);
 }
-
-struct window *active_window;
-#define MAX_WINDOWS 64
-struct window *windows[MAX_WINDOWS];
-int open_windows = 0;
 
 static void keyboard_enter(void *data, struct wl_keyboard *wl_keyboard, uint32_t serial,
                            struct wl_surface *surface, struct wl_array *keys) {
@@ -237,8 +380,8 @@ static void keyboard_key(void *data, struct wl_keyboard *wl_keyboard, uint32_t s
                          uint32_t time, uint32_t key, uint32_t _key_state) {
     /* struct window *w = data; */
     enum wl_keyboard_key_state key_state = _key_state;
-    xkb_keysym_t sym = xkb_state_key_get_one_sym(xkb_state, key + 8);
-    fprintf(stderr, "handling keyinput\n");
+    xkb_keysym_t sym = xkb_state_key_get_one_sym(g_xkb_state, key + 8);
+    /* fprintf(stderr, "handling keyinput\n"); */
 
     if (key_state != WL_KEYBOARD_KEY_STATE_PRESSED)
         return;
@@ -263,8 +406,12 @@ static void seat_handle_capabilities(void *data, struct wl_seat *wl_seat,
                                      enum wl_seat_capability caps) {
     struct window *w = data;
     if (caps & WL_SEAT_CAPABILITY_KEYBOARD) {
-        kbd = wl_seat_get_keyboard(seat);
-        wl_keyboard_add_listener(kbd, &keyboard_listener, NULL);
+        g_kbd = wl_seat_get_keyboard(g_seat);
+        wl_keyboard_add_listener(g_kbd, &keyboard_listener, NULL);
+    }
+    if (caps & WL_SEAT_CAPABILITY_POINTER) {
+        g_pointer = wl_seat_get_pointer(g_seat);
+        wl_pointer_add_listener(g_pointer, &pointer_listener, NULL);
     }
 }
 static void seat_handle_name(void *data, struct wl_seat *wl_seat, const char *name) {
@@ -276,7 +423,7 @@ const struct wl_seat_listener seat_listener = {
     .name = seat_handle_name,
 };
 static void buffer_release(void *data, struct wl_buffer *wl_buffer) {
-    fprintf(stderr, "released buffer\n");
+    /* fprintf(stderr, "released buffer\n"); */
 }
 
 static const struct wl_buffer_listener buffer_listener = {.release = buffer_release};
@@ -293,7 +440,7 @@ static void handle_toplevel_configure(void *data, struct xdg_toplevel *toplevel,
         w->width = width;
         w->height = height;
     }
-    fprintf(stderr, "width: %i, height: %i\n", w->width, w->height);
+    /* fprintf(stderr, "width: %i, height: %i\n", w->width, w->height); */
     if (w->configured) {
         resize_surface(w);
         wl_surface_commit(w->surface);
@@ -302,7 +449,7 @@ static void handle_toplevel_configure(void *data, struct xdg_toplevel *toplevel,
 }
 
 static void handle_toplevel_close(void *data, struct xdg_toplevel *xdg_toplevel) {
-    fprintf(stderr, "closing window\n");
+    /* fprintf(stderr, "closing window\n"); */
     struct window *w = data;
     w->open = false;
 }
@@ -331,32 +478,50 @@ const struct wl_callback_listener frame_listener = {
 void draw(struct window *w) {
     if (!w->open)
         return;
-    fprintf(stderr, "drawing...\n");
+    /* fprintf(stderr, "drawing...\n"); */
     cairo_t *cairo = w->cairo;
     cairo_move_to(cairo, 0, 0);
-    cairo_set_source_u32(cairo, 0x0);
+    cairo_set_source_u32(cairo, 0x000000ff);
     cairo_rectangle(cairo, 0, 0, w->width * scale, w->height * scale);
     cairo_fill(cairo);
-    cairo_set_source_u32(cairo, 0xffffffff);
-    cairo_rectangle(cairo, 200, 200, w->width * 2 - 400, w->height * 2 - 400);
-
-    cairo_fill(cairo);
-
-    cairo_set_source_u32(cairo, 0x000000ff);
-    cairo_move_to(cairo, 200, 200);
-    cairo_line_to(cairo, w->width * scale - 200, 200);
-    cairo_line_to(cairo, 200, w->height * scale - 200);
-    cairo_close_path(cairo);
-    cairo_fill(cairo);
 
     cairo_set_source_u32(cairo, 0xffffffff);
-    cairo_move_to(cairo, 250, 250);
-    pango_printf(cairo, font, scale, false, "emacs %d", ++counter);
 
-    if (w == active_window) {
-        cairo_move_to(cairo, 250, 350);
-        pango_printf(cairo, font, scale, false, "active");
+    /* fprintf(stderr, "x: %f y: %f\n", w->position[1], w->position[0]); */
+
+    for (int x = -1600; x < w->width * scale; x += 800) {
+        int row = 0;
+        for (int y = -1600; y < w->height * scale; y += 400) {
+            row++;
+
+            cairo_rectangle(cairo, x + w->position[1] + ((row % 2) * 400),
+                            y + w->position[0], 400, 400);
+            cairo_fill(cairo);
+        }
     }
+
+    /* cairo_rectangle(cairo, 200, 200, w->width * 2 - 400, w->height * 2 - 400); */
+
+    /* cairo_set_source_u32(cairo, 0x000000ff); */
+    /* cairo_move_to(cairo, 200, 200); */
+    /* cairo_line_to(cairo, w->width * scale - 200, 200); */
+    /* cairo_line_to(cairo, 200, w->height * scale - 200); */
+    /* cairo_close_path(cairo); */
+    /* cairo_fill(cairo); */
+
+    /* /\* cairo_set_source_u32(cairo, 0xffffffff); *\/ */
+    /* /\* cairo_move_to(cairo, 250, 250); *\/ */
+    /* /\* pango_printf(cairo, font, scale, false, "emacs %d", ++counter); *\/ */
+
+    /* /\* if (w == active_window) { *\/ */
+    /* /\*     cairo_move_to(cairo, 250, 350); *\/ */
+    /* /\*     pango_printf(cairo, font, scale, false, "active"); *\/ */
+    /* /\* } *\/ */
+
+    /* cairo_set_source_u32(cairo, 0x888888ff); */
+    /* cairo_move_to(cairo, 1000, 1000); */
+    /* cairo_line_to(cairo, 1000 + scroll[1] / 10, 1000 + scroll[0] / 10); */
+    /* cairo_stroke(cairo); */
 
     wl_surface_damage(w->surface, 0, 0, w->width, w->height);
     wl_surface_attach(w->surface, w->buffer, 0, 0);
@@ -374,7 +539,7 @@ static void resize_surface(struct window *window) {
         return;
     if (!window->resized)
         return;
-    fprintf(stderr, "resizing surface\n");
+    /* fprintf(stderr, "resizing surface\n"); */
     int stride = window->width * 4;
     int size = stride * window->height;
 
@@ -401,7 +566,7 @@ static void resize_surface(struct window *window) {
 static void handle_xdg_buffer_configure(void *data, struct xdg_surface *xdg_surface,
                                         uint32_t serial) {
     struct window *w = data;
-    fprintf(stderr, "configured xdg surface\n");
+    /* fprintf(stderr, "configured xdg surface\n"); */
     xdg_surface_ack_configure(w->xdg_surface, serial);
 }
 
@@ -416,14 +581,14 @@ static void handle_global(void *data, struct wl_registry *registry, uint32_t nam
             wl_registry_bind(registry, name, &wl_compositor_interface, version);
 
     } else if (strcmp(interface, wl_seat_interface.name) == 0) {
-        seat = wl_registry_bind(registry, name, &wl_seat_interface, version);
-        wl_seat_add_listener(seat, &seat_listener, NULL);
+        g_seat = wl_registry_bind(registry, name, &wl_seat_interface, version);
+        wl_seat_add_listener(g_seat, &seat_listener, NULL);
 
     } else if (strcmp(interface, wl_shm_interface.name) == 0) {
         g_shm = wl_registry_bind(registry, name, &wl_shm_interface, version);
 
     } else if (strcmp(interface, xdg_wm_base_interface.name) == 0) {
-        xdg_wm_base = wl_registry_bind(registry, name, &xdg_wm_base_interface, version);
+        g_xdg_wm_base = wl_registry_bind(registry, name, &xdg_wm_base_interface, version);
     }
 }
 
@@ -446,12 +611,16 @@ struct window *create_window() {
     w->height = 200;
     w->resized = true;
     w->open = true;
+    w->position[0] = 0;
+    w->position[1] = 0;
+    w->__position_pending[0] = 0;
+    w->__position_pending[1] = 0;
 
     w->surface = wl_compositor_create_surface(g_compositor);
     wl_surface_set_user_data(w->surface, w);
     wl_surface_set_buffer_scale(w->surface, scale);
 
-    w->xdg_surface = xdg_wm_base_get_xdg_surface(xdg_wm_base, w->surface);
+    w->xdg_surface = xdg_wm_base_get_xdg_surface(g_xdg_wm_base, w->surface);
     w->xdg_toplevel = xdg_surface_get_toplevel(w->xdg_surface);
 
     xdg_surface_add_listener(w->xdg_surface, &xdg_surface_listener, w);
@@ -502,6 +671,7 @@ int main(int argc, char *argv[]) {
     while (wl_display_dispatch(g_display) != -1 && open_windows) {
     }
 
+    wl_registry_destroy(registry);
     wl_display_disconnect(g_display);
 
     return 0;

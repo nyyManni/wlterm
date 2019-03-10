@@ -43,16 +43,21 @@ struct window {
     int width;
     int height;
 
+    /* bool inertia; */
+
     bool resized;
     bool configured;
     double position[2];
-    double __position_pending[2];
+    int32_t __position_pending[2];
+    double inertia[2]; /* Pixels per second */
+    uint32_t axis_time[2];
+    double velocity[2];
 };
 
 /* int32_t scroll[2]; */
 /* uint32_t scroll_time[2]; */
 
-bool configured = false;
+/* bool configured = false; */
 static char *font = "Mono";
 
 int scale = 2;
@@ -216,13 +221,12 @@ static void pointer_handle_enter(void *data, struct wl_pointer *pointer, uint32_
 }
 
 static void pointer_handle_leave(void *data, struct wl_pointer *pointer, uint32_t serial,
-                                 struct wl_surface *surface) {
-}
+                                 struct wl_surface *surface) {}
 
 static void pointer_handle_motion(void *data, struct wl_pointer *pointer, uint32_t time,
                                   wl_fixed_t sx, wl_fixed_t sy) {
 
-    fprintf(stderr, "axis motion\n");
+    /* fprintf(stderr, "axis motion\n"); */
 }
 
 static void pointer_handle_button(void *data, struct wl_pointer *wl_pointer,
@@ -230,6 +234,7 @@ static void pointer_handle_button(void *data, struct wl_pointer *wl_pointer,
                                   uint32_t state) {
     /* struct display *display = data; */
 
+    active_window->inertia[0] = active_window->inertia[1] = 0.0;
     /* if (!display->window->xdg_toplevel) */
     /*     return; */
 
@@ -248,20 +253,31 @@ static void pointer_handle_axis(void *data, struct wl_pointer *wl_pointer, uint3
     /*     scroll[1] = 0; */
     /* } */
 
-    active_window->__position_pending[axis] -= value / 100.0;
-    /* fprintf(stderr, "scroll scroll scroll\n"); */
+    active_window->__position_pending[axis] = value;
+    /* fprintf(stderr, "scroll time: %d\n", time); */
 
+    active_window->velocity[axis] = (double)active_window->__position_pending[axis] /
+                                    (time - active_window->axis_time[axis]);
+    active_window->axis_time[axis] = time;
+    /* fprintf(stderr, "scroll scroll scroll\n"); */
 
     /* Trigger a throttled redraw */
 }
 
 static void pointer_handle_frame(void *data, struct wl_pointer *wl_pointer) {
 
-    if (fabs (active_window->__position_pending[0]) < 0.0001 &&
-        fabs (active_window->__position_pending[1]) < 0.0001) return;
+    if (!active_window->__position_pending[0] && !active_window->__position_pending[1])
+        return;
 
     for (uint32_t axis = 0; axis < 2; ++axis) {
-        active_window->position[axis] += active_window->__position_pending[axis];
+
+        /* active_window->axis_time[axis] = 0; */
+        /* if (active_window->__position_pending[axis]) { */
+        /* } else { */
+        /*     active_window->velocity[axis] = 0.0; */
+        /* } */
+
+        active_window->position[axis] += active_window->__position_pending[axis] / 100.0;
 
         while (active_window->position[axis] < 0)
             active_window->position[axis] += 800;
@@ -281,12 +297,32 @@ static void pointer_handle_frame(void *data, struct wl_pointer *wl_pointer) {
 
 static void pointer_handle_axis_source(void *data, struct wl_pointer *wl_pointer,
                                        uint32_t axis_source) {
-    fprintf(stderr, "axis source\n");
-
+    /* fprintf(stderr, "axis source: %d\n", axis_source); */
 }
 static void pointer_handle_axis_stop(void *data, struct wl_pointer *wl_pointer,
                                      uint32_t time, uint32_t axis) {
-    fprintf(stderr, "axis stop\n");
+    /* active_window->inertia = true; */
+    active_window->inertia[axis] = 1.0;
+    /* active_window->inertia[0] = active_window->inertia[0] = 0.0; */
+
+    uint32_t tdiff = time - active_window->axis_time[axis];
+    /* fprintf(stderr, "%d\n", active_window->axis_time[axis]); */
+    /* fprintf(stderr, "scroll velocity: %f\n", active_window->velocity[axis]); */
+    /* fprintf(stderr, "scroll velocity: %f\n", active_window->velocity[1]); */
+
+    active_window->inertia[axis] = active_window->velocity[axis];
+    /* active_window->inertia[1] = active_window->velocity[1]; */
+    active_window->velocity[axis] = 0;
+    /* active_window->velocity[1] = 0; */
+
+    wl_surface_commit(active_window->surface);
+    /* fprintf(stderr, "axis stop\n"); */
+    /* active_window->axis_time[0] = active_window->axis_time[1] = 0; */
+    if (time - active_window->axis_time[axis] > 30) {
+        active_window->inertia[axis] = 0;
+    }
+
+    active_window->axis_time[axis] = 0;
 }
 static void pointer_handle_axis_discrete(void *data, struct wl_pointer *wl_pointer,
                                          uint32_t axis, int32_t discrete) {
@@ -451,7 +487,8 @@ static void handle_toplevel_configure(void *data, struct xdg_toplevel *toplevel,
 static void handle_toplevel_close(void *data, struct xdg_toplevel *xdg_toplevel) {
     /* fprintf(stderr, "closing window\n"); */
     struct window *w = data;
-    w->open = false;
+    close_window(w);
+    /* w->open = false; */
 }
 
 static const struct xdg_toplevel_listener xdg_toplevel_listener = {
@@ -465,10 +502,33 @@ static void handle_ping(void *data, struct xdg_wm_base *xdg_wm_base, uint32_t se
 
 static const struct xdg_wm_base_listener xdg_base_listener = {.ping = handle_ping};
 
+const struct wl_callback_listener frame_listener;
 static void frame_handle_done(void *data, struct wl_callback *callback, uint32_t time) {
+    static uint32_t t = 0;
+    /* fprintf(stderr, "drawing frame: %d ms\n", time - t); */
+    t = time;
+
+    /* fprintf(stderr, "frame!!\n"); */
     struct window *w = data;
     wl_callback_destroy(callback);
     draw(w);
+    callback = wl_surface_frame(w->surface);
+    wl_callback_add_listener(callback, &frame_listener, w);
+
+    if (fabs(w->inertia[0]) > 1 || fabs(w->inertia[1]) > 1) {
+
+        for (uint32_t axis = 0; axis < 2; ++axis) {
+            w->position[axis] += w->inertia[axis] / 3.0;
+
+            while (w->position[axis] < 0)
+                w->position[axis] += 800;
+            while (w->position[axis] > 800)
+                w->position[axis] -= 800;
+
+            w->inertia[axis] *= 0.92;
+        }
+        wl_surface_commit(w->surface);
+    }
 }
 
 const struct wl_callback_listener frame_listener = {
@@ -494,9 +554,12 @@ void draw(struct window *w) {
         for (int y = -1600; y < w->height * scale; y += 400) {
             row++;
 
-            cairo_rectangle(cairo, x + w->position[1] + ((row % 2) * 400),
-                            y + w->position[0], 400, 400);
-            cairo_fill(cairo);
+            cairo_move_to(cairo, x + w->position[1] + ((row % 2) * 400),
+                          y + w->position[0]);
+            pango_printf(cairo, font, scale, false, "Emacs");
+            /* cairo_rectangle(cairo, x + w->position[1] + ((row % 2) * 400), */
+            /*                 y + w->position[0], 400, 400); */
+            /* cairo_fill(cairo); */
         }
     }
 
@@ -529,8 +592,6 @@ void draw(struct window *w) {
     /* memset(w->shm_data, 0xff, w->width * 4 * w->height * scale * scale); */
 
     /* if (cb) { */
-    struct wl_callback *callback = wl_surface_frame(w->surface);
-    wl_callback_add_listener(callback, &frame_listener, w);
     /* } */
 }
 
@@ -615,6 +676,8 @@ struct window *create_window() {
     w->position[1] = 0;
     w->__position_pending[0] = 0;
     w->__position_pending[1] = 0;
+    w->inertia[0] = w->inertia[1] = 0.0;
+    w->axis_time[0] = w->axis_time[1] = 0;
 
     w->surface = wl_compositor_create_surface(g_compositor);
     wl_surface_set_user_data(w->surface, w);

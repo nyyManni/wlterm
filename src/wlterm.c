@@ -488,7 +488,6 @@ static void handle_toplevel_close(void *data, struct xdg_toplevel *xdg_toplevel)
     /* fprintf(stderr, "closing window\n"); */
     struct window *w = data;
     close_window(w);
-    /* w->open = false; */
 }
 
 static const struct xdg_toplevel_listener xdg_toplevel_listener = {
@@ -662,9 +661,8 @@ static const struct wl_registry_listener registry_listener = {
 };
 
 struct window *create_window() {
-    struct window **wp = &windows[0];
-    while (*wp++)
-        ;
+    struct window **wp = windows - 1;
+    while (*++wp);
     struct window *w = *wp = malloc(sizeof(struct window));
 
     w->configured = false;
@@ -710,9 +708,8 @@ void close_window(struct window *w) {
     wl_surface_destroy(w->surface);
     wl_buffer_destroy(w->buffer);
 
-    struct window **wp = &windows[0];
-    while (*wp != w)
-        wp++;
+    struct window **wp = windows - 1;
+    while (*++wp != w);
     free(w);
     *wp = NULL;
 

@@ -38,9 +38,6 @@ struct wl_pointer *g_pointer;
 struct xdg_wm_base *g_xdg_wm_base;
 struct wl_shm *g_shm;
 
-		GLuint rotation_uniform;
-		GLuint pos;
-		GLuint col;
 
 struct window {
 
@@ -77,6 +74,11 @@ struct window {
 
 	GLuint shader_program;
 
+    int32_t rotation_offset;
+
+    GLuint rotation_uniform;
+    GLuint pos;
+    GLuint col;
 };
 
 static const EGLint context_attribs[] = {EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE};
@@ -492,7 +494,7 @@ void draw(struct window *w) {
 		{ 0, 0, 1, 0 },
 		{ 0, 0, 0, 1 }
 	};
-	static const uint32_t speed_div = 100, benchmark_interval = 5;
+	static const uint32_t speed_div = 5, benchmark_interval = 5;
 	struct wl_region *region;
 	EGLint rect[4];
 	EGLint buffer_age = 0;
@@ -501,30 +503,28 @@ void draw(struct window *w) {
 	gettimeofday(&tv, NULL);
 	uint32_t time = tv.tv_sec * 1000 + tv.tv_usec / 1000;
 
-	angle = fmod((time / (double)speed_div), 360) * M_PI / 180.0;
+	angle = fmod(((time + w->rotation_offset) / (double)speed_div), 360) * M_PI / 180.0;
 	rotation[0][0] =  cos(angle);
 	rotation[0][2] =  sin(angle);
 	rotation[2][0] = -sin(angle);
 	rotation[2][2] =  cos(angle);
 
-
 	glViewport(0, 0, w->width * 2, w->height * 2);
 
-	glUniformMatrix4fv(rotation_uniform, 1, GL_FALSE,
-			   (GLfloat *) rotation);
+	glUniformMatrix4fv(w->rotation_uniform, 1, GL_FALSE, (GLfloat *) rotation);
 
 	glClearColor(0.0, 0.0, 0.0, 0.5);
 	glClear(GL_COLOR_BUFFER_BIT);
 
-	glVertexAttribPointer(pos, 2, GL_FLOAT, GL_FALSE, 0, verts);
-	glVertexAttribPointer(col, 3, GL_FLOAT, GL_FALSE, 0, colors);
-	glEnableVertexAttribArray(pos);
-	glEnableVertexAttribArray(col);
+	glVertexAttribPointer(w->pos, 2, GL_FLOAT, GL_FALSE, 0, verts);
+	glVertexAttribPointer(w->col, 3, GL_FLOAT, GL_FALSE, 0, colors);
+	glEnableVertexAttribArray(w->pos);
+	glEnableVertexAttribArray(w->col);
 
 	glDrawArrays(GL_TRIANGLES, 0, 3);
 
-	glDisableVertexAttribArray(pos);
-	glDisableVertexAttribArray(col);
+	glDisableVertexAttribArray(w->pos);
+	glDisableVertexAttribArray(w->col);
     eglSwapBuffers(g_gl_display, w->gl_surface);
 
     /* fprintf(stderr, "drawing...\n"); */
@@ -668,6 +668,12 @@ struct window *create_window() {
     w->inertia[0] = w->inertia[1] = 0.0;
     w->axis_time[0] = w->axis_time[1] = 0;
 
+	struct timeval tv;
+
+	gettimeofday(&tv, NULL);
+	w->rotation_offset = tv.tv_sec * 1000 + tv.tv_usec / 1000;
+
+
     w->gl_ctx = eglCreateContext(g_gl_display, g_gl_conf, EGL_NO_CONTEXT, context_attribs);
 
     w->surface = wl_compositor_create_surface(g_compositor);
@@ -712,13 +718,13 @@ struct window *create_window() {
 
 	glUseProgram(w->shader_program);
 
-	pos = 0;
-	col = 1;
+	w->pos = 0;
+	w->col = 1;
 
-	glBindAttribLocation(w->shader_program, pos, "pos");
-	glBindAttribLocation(w->shader_program, col, "color");
+	glBindAttribLocation(w->shader_program, w->pos, "pos");
+	glBindAttribLocation(w->shader_program, w->col, "color");
 
-	rotation_uniform = glGetUniformLocation(w->shader_program, "rotation");
+	w->rotation_uniform = glGetUniformLocation(w->shader_program, "rotation");
 
     wl_display_roundtrip(g_display);
     wl_surface_commit(w->surface);
@@ -730,16 +736,19 @@ struct window *create_window() {
     struct wl_callback *callback = wl_surface_frame(w->surface);
     wl_callback_add_listener(callback, &frame_listener, w);
     open_windows++;
+    draw(w);
     return w;
 }
 
 void close_window(struct window *w) {
     w->open = false;
 
+    platform_destroy_egl_surface(g_gl_display, w->gl_surface);
+
     xdg_toplevel_destroy(w->xdg_toplevel);
     xdg_surface_destroy(w->xdg_surface);
     wl_surface_destroy(w->surface);
-    wl_buffer_destroy(w->buffer);
+    /* wl_buffer_destroy(w->buffer); */
 
     struct window **wp = windows - 1;
     while (*++wp != w);
@@ -791,11 +800,12 @@ int main(int argc, char *argv[]) {
     struct window *w = create_window();
 
     running = true;
-    draw(w);
     while (wl_display_dispatch(g_display) != -1 && open_windows) {
         fprintf(stderr, "dispatched\n");
     /* draw(w); */
     }
+    eglTerminate(g_gl_display);
+    eglReleaseThread();
 
     wl_registry_destroy(registry);
     wl_display_disconnect(g_display);

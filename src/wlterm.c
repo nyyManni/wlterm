@@ -7,29 +7,22 @@
 #include <time.h>
 #include <unistd.h>
 
-#include <cairo/cairo.h>
-#include <pango/pangocairo.h>
 #include <xkbcommon/xkbcommon.h>
 
 #include <sys/time.h>
 
 #include <GLES2/gl2.h>
-#include <EGL/egl.h>
-#include <EGL/eglext.h>
 
 #include <wayland-client-protocol.h>
 #include <wayland-client.h>
 #include <wayland-egl.h>
 
 #include "xdg-shell-client-protocol.h"
-#include "egl_util.h"
 #include "egl_window.h"
 
 static int counter = 0;
 
 struct wl_display *g_display;
-EGLDisplay g_gl_display;
-EGLConfig g_gl_conf;
 struct wl_compositor *g_compositor;
 struct wl_seat *g_seat;
 struct xkb_keymap *g_xkb_keymap;
@@ -39,13 +32,6 @@ struct wl_pointer *g_pointer;
 struct xdg_wm_base *g_xdg_wm_base;
 struct wl_shm *g_shm;
 
-
-
-static const EGLint context_attribs[] = {EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE};
-
-
-bool running;
-
 extern struct window *active_window;
 extern struct window *windows[];
 extern int open_windows;
@@ -54,7 +40,6 @@ extern int open_windows;
 static void pointer_handle_enter(void *data, struct wl_pointer *pointer, uint32_t serial,
                                  struct wl_surface *surface, wl_fixed_t sx,
                                  wl_fixed_t sy) {
-    fprintf(stderr, "enter\n");
     /* struct display *display = data; */
     /* struct wl_buffer *buffer; */
     /* struct wl_cursor *cursor = display->default_cursor; */
@@ -369,43 +354,11 @@ int main(int argc, char *argv[]) {
 
     wl_display_roundtrip(g_display);
 
-    EGLint config_attribs[] = {
-        EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
-        EGL_RED_SIZE, 1,
-        EGL_GREEN_SIZE, 1,
-        EGL_BLUE_SIZE, 1,
-        EGL_ALPHA_SIZE, 1,
-        EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
-        EGL_NONE
-    };
-    g_gl_display = platform_get_egl_display(EGL_PLATFORM_WAYLAND_KHR, g_display, NULL);
-    EGLint major, minor, count, n, size, i;
-    EGLConfig *configs;
-    eglInitialize(g_gl_display, &major, &minor);
-    eglBindAPI(EGL_OPENGL_ES_API);
-    eglGetConfigs(g_gl_display, NULL, 0, &count);
-    configs = calloc(count, sizeof *configs);
-    eglChooseConfig(g_gl_display, config_attribs, configs, count, &n);
-    eglSwapInterval(g_gl_display, 0);
-
-    for (i = 0; i < n; i++) {
-        eglGetConfigAttrib(g_gl_display,
-                   configs[i], EGL_BUFFER_SIZE, &size);
-        if (size == 32) {
-            g_gl_conf = configs[i];
-            break;
-        }
-    }
-
-    free(configs);
-
-    /* struct window *w = create_window(); */
+    init_egl();
     struct window *w = window_create();
 
-    running = true;
     while (wl_display_dispatch(g_display) != -1 && open_windows) {}
-    eglTerminate(g_gl_display);
-    eglReleaseThread();
+    kill_egl();
 
     wl_registry_destroy(registry);
     wl_display_disconnect(g_display);

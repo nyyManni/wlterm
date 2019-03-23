@@ -1,5 +1,7 @@
-#include <stdbool.h>
+#ifndef EGL_WINDOW_H
+#define EGL_WINDOW_H
 
+#include <stdbool.h>
 
 #include <GLES2/gl2.h>
 #include <EGL/egl.h>
@@ -35,11 +37,17 @@ struct window {
     /* Window contents. */
     uint32_t rotation_offset;
     GLuint rotation_uniform;
+    GLuint offset_uniform;
+    GLuint projection_uniform;
     GLuint pos;
     GLuint col;
 };
 
 
+void init_egl();
+void kill_egl();
 struct window *window_create();
 void window_close(struct window *);
 void window_render(struct window *);
+
+#endif /* EGL_WINDOW_H */

@@ -1,3 +1,5 @@
+#ifndef EGL_UTIL_H
+#define EGL_UTIL_H
 #include <stdlib.h>
 #include <sys/time.h>
 #include <GLES2/gl2.h>
@@ -34,3 +36,5 @@ static inline uint32_t timestamp() {
 	gettimeofday(&tv, NULL);
 	return tv.tv_sec * 1000 + tv.tv_usec / 1000;
 }
+
+#endif /* EGL_UTIL_H */

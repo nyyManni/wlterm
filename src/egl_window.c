@@ -1,9 +1,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <ft2build.h>
+#include FT_FREETYPE_H
+
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
 #include <GLES2/gl2.h>
+#include <cglm/mat4.h>
+#include <cglm/cam.h>
 
 #include <wayland-client-protocol.h>
 #include <wayland-client.h>
@@ -13,10 +18,12 @@
 #include "egl_window.h"
 #include "xdg-shell-client-protocol.h"
 
+FT_Library FT;
+
 
 extern struct wl_display *g_display;
-extern EGLDisplay g_gl_display;
-extern EGLConfig g_gl_conf;
+EGLDisplay g_gl_display;
+EGLConfig g_gl_conf;
 
 extern struct wl_compositor *g_compositor;
 extern struct xdg_wm_base *g_xdg_wm_base;
@@ -76,6 +83,47 @@ static void handle_xdg_buffer_configure(void *data, struct xdg_surface *xdg_surf
 static struct xdg_surface_listener xdg_surface_listener = {
     .configure = handle_xdg_buffer_configure};
 
+
+void init_egl() {
+
+    EGLint config_attribs[] = {
+        EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
+        EGL_RED_SIZE, 1,
+        EGL_GREEN_SIZE, 1,
+        EGL_BLUE_SIZE, 1,
+        EGL_ALPHA_SIZE, 1,
+        EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
+        EGL_NONE
+    };
+    g_gl_display = platform_get_egl_display(EGL_PLATFORM_WAYLAND_KHR, g_display, NULL);
+    EGLint major, minor, count, n, size, i;
+    EGLConfig *configs;
+    eglInitialize(g_gl_display, &major, &minor);
+    eglBindAPI(EGL_OPENGL_ES_API);
+    eglGetConfigs(g_gl_display, NULL, 0, &count);
+    configs = calloc(count, sizeof *configs);
+    eglChooseConfig(g_gl_display, config_attribs, configs, count, &n);
+    eglSwapInterval(g_gl_display, 0);
+
+    for (i = 0; i < n; i++) {
+        eglGetConfigAttrib(g_gl_display,
+                   configs[i], EGL_BUFFER_SIZE, &size);
+        if (size == 32) {
+            g_gl_conf = configs[i];
+            break;
+        }
+    }
+
+    free(configs);
+}
+
+void kill_egl() {
+
+    eglTerminate(g_gl_display);
+    eglReleaseThread();
+}
+
+
 struct window *window_create() {
     struct window **wp = windows - 1;
 
@@ -87,9 +135,8 @@ struct window *window_create() {
 
     w->width = 200;
     w->height = 200;
-    /* w->resized = true; */
     w->open = true;
-    w->rotation_uniform = timestamp();
+    w->rotation_offset = timestamp();
 
     w->gl_ctx = eglCreateContext(g_gl_display, g_gl_conf, EGL_NO_CONTEXT, context_attribs);
 
@@ -140,6 +187,8 @@ struct window *window_create() {
     glBindAttribLocation(w->shader_program, w->col, "color");
 
     w->rotation_uniform = glGetUniformLocation(w->shader_program, "rotation");
+    w->offset_uniform = glGetUniformLocation(w->shader_program, "offset");
+    w->projection_uniform = glGetUniformLocation(w->shader_program, "projection");
 
     wl_display_roundtrip(g_display);
     wl_surface_commit(w->surface);
@@ -162,11 +211,16 @@ void window_render(struct window *w) {
     if (!w->open)
         return;
 
-    static const GLfloat verts[3][2] = {
-        { -0.5, -0.5 },
-        {  0.5, -0.5 },
-        {  0,    0.5 }
+    GLfloat verts[3][2] = {
+        {w->width, 0},
+        {0, w->height * SCALE},
+        {w->width * SCALE, w->height * SCALE}
     };
+    /* verts[0][0] = w->width; */
+    /* verts[1][0] = w->width * SCALE; */
+    /* verts[1][1] = w->height * SCALE; */
+    /* verts[0][0] = w->height * SCALE; */
+
     static const GLfloat colors[3][3] = {
         { 1, 0, 0 },
         { 0, 1, 0 },
@@ -185,14 +239,21 @@ void window_render(struct window *w) {
     EGLint buffer_age = 0;
 
     angle = fmod(((timestamp() + w->rotation_offset) / (double)speed_div), 360) * M_PI / 180.0;
-    rotation[0][0] =  cos(angle);
-    rotation[0][2] =  sin(angle);
-    rotation[2][0] = -sin(angle);
-    rotation[2][2] =  cos(angle);
+    /* rotation[0][0] =  cos(angle); */
+    /* rotation[0][2] =  sin(angle); */
+    /* rotation[2][0] = -sin(angle); */
+    /* rotation[2][2] =  cos(angle); */
 
-    glViewport(0, 0, w->width * 2, w->height * 2);
+    GLfloat offset[4] = {0.0, 0.0, 0, 0};
+
+    glViewport(0, 0, w->width * SCALE, w->height * SCALE);
+    mat4 projection;
+
+    glm_ortho(0.0, w->width * SCALE, w->height * SCALE, 0.0, -1.0, 1.0, projection);
 
     glUniformMatrix4fv(w->rotation_uniform, 1, GL_FALSE, (GLfloat *) rotation);
+    glUniformMatrix4fv(w->projection_uniform, 1, GL_FALSE, (GLfloat *) projection);
+    glUniform4fv(w->offset_uniform, 1, (GLfloat *) offset);
 
     glClearColor(0.0, 0.0, 0.0, 0.5);
     glClear(GL_COLOR_BUFFER_BIT);

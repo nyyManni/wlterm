@@ -28,7 +28,7 @@
         }                                         \
     } while (0);
 
-bool first_window = true;
+int line_spacing = 50;
 
 FT_Library ft = NULL;
 FT_Face face = NULL;
@@ -165,19 +165,12 @@ bool load_font(const char *font_name, int height) {
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    /* active_glyph.code = 0x00e4; */
-    /* FT_Load_Char(face, active_glyph.code, FT_LOAD_RENDER); */
-
     glGenTextures(1, &font_texture);
-    /* GLuint fbo; */
-    /* glGenFramebuffers(1, &fbo); */
-    /* glBindFramebuffer(GL_FRAMEBUFFER, fbo); */
     glBindTexture(GL_TEXTURE_2D, font_texture);
 
 
     FT_GlyphSlot g = face->glyph;
 
-    /* active_glyph.texture = font_texture; */
     glTexImage2D(
       GL_TEXTURE_2D,
       0,
@@ -189,12 +182,6 @@ bool load_font(const char *font_name, int height) {
       GL_UNSIGNED_BYTE,
       0
     );
-    /* active_glyph.offset_x = 100.0 / FONT_BUFFER_SIZE; */
-    /* active_glyph.offset_y = 100.0 / FONT_BUFFER_SIZE; */
-    /* active_glyph.width = g->bitmap.width / (double)FONT_BUFFER_SIZE; */
-    /* active_glyph.height = g->bitmap.rows / (double)FONT_BUFFER_SIZE; */
-    /* glTexSubImage2D(GL_TEXTURE_2D, 0, 100, 100, g->bitmap.width, g->bitmap.rows, */
-    /*                 GL_RED, GL_UNSIGNED_BYTE, g->bitmap.buffer); */
 
     int offset_x = 0, offset_y = 0, y_increment = 0;
 
@@ -224,7 +211,6 @@ bool load_font(const char *font_name, int height) {
 
         offset_x += g->bitmap.width;
     }
-
 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
@@ -314,29 +300,44 @@ struct window *window_create() {
 }
 
 
-void render_text(GLfloat *buf, const char *text, int x, int y) {
-    size_t n = strlen(text);
+void render_text(char *texts[], int nrows, int x, int y) {
+    static GLfloat text_data[128 * 6 * 4] = {0};
+    int total = 0;
+    int counter = 0;
+    int orig_x = x;
+    for (size_t j = 0; j < nrows; ++j) {
+        const char *text = texts[j];
+        size_t n = strlen(text);
+        total += n;
 
-    for (size_t i = 0; i < n; ++i) {
-        struct glyph g = glyph_map[text[i]];
-        GLfloat _w = g.width * FONT_BUFFER_SIZE;
-        GLfloat _h = g.height * FONT_BUFFER_SIZE;
-        GLfloat _x = x + g.bearing_x;
-        GLfloat _y = y - g.bearing_y;
-        GLfloat c[6][4] = {
-            {_x, _y, g.offset_x, g.offset_y},
-            {_x + _w, _y, g.offset_x + g.width, g.offset_y},
-            {_x, _y + _h, g.offset_x, g.offset_y + g.height},
-            
-            {_x, _y + _h, g.offset_x, g.offset_y + g.height},
-            {_x + _w, _y, g.offset_x + g.width, g.offset_y},
-            {_x + _w, _y + _h, g.offset_x + g.width, g.offset_y + g.height},
-        };
-        memcpy(&buf[i * 6 * 4 * sizeof(GLfloat)], &c, 6 * 4 * sizeof(GLfloat));
+        struct glyph *_g = NULL;
 
-        x += g.advance;
+        for (size_t i = 0; i < n; ++i) {
+            struct glyph g = glyph_map[text[i]];
+            _g = &g;
+            GLfloat _w = g.width * FONT_BUFFER_SIZE;
+            GLfloat _h = g.height * FONT_BUFFER_SIZE;
+            GLfloat _x = x + g.bearing_x;
+            GLfloat _y = y - g.bearing_y;
+            GLfloat c[6][4] = {
+                {_x, _y, g.offset_x, g.offset_y},
+                {_x + _w, _y, g.offset_x + g.width, g.offset_y},
+                {_x, _y + _h, g.offset_x, g.offset_y + g.height},
 
+                {_x, _y + _h, g.offset_x, g.offset_y + g.height},
+                {_x + _w, _y, g.offset_x + g.width, g.offset_y},
+                {_x + _w, _y + _h, g.offset_x + g.width, g.offset_y + g.height},
+            };
+            memcpy(&text_data[counter * 6 * 4 * sizeof(GLfloat)], &c, 6 * 4 * sizeof(GLfloat));
+            counter++;
+
+            x += g.advance;
+        }
+        y += line_spacing;
+        x = orig_x;
     }
+    glBufferData(GL_ARRAY_BUFFER, total * 24 * total * sizeof(GLfloat), text_data, GL_DYNAMIC_DRAW);
+    glDrawArrays(GL_TRIANGLES, 0, 32 * total);
 }
 
 
@@ -367,14 +368,11 @@ void window_render(struct window *w) {
     glEnableVertexAttribArray(0);
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
     glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 0, 0);
-
-    static GLfloat TEXT_DATA[128][6][4] = {0};
-    render_text((GLfloat *)TEXT_DATA, "lol", 100, 100);
-
- 
-    glBufferData(GL_ARRAY_BUFFER, sizeof TEXT_DATA, TEXT_DATA, GL_DYNAMIC_DRAW);
-
-    glDrawArrays(GL_TRIANGLES, 0, 12 * 6);
+    char *texts[2] = {0};
+    texts[0] = "lol";
+    texts[1] = "xd";
+    texts[2] = "oh boy";
+    render_text(texts, 3, 100, 100);
 
     glBindTexture(GL_TEXTURE_2D, 0);
     glDisableVertexAttribArray(0);

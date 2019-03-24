@@ -343,7 +343,7 @@ int main(int argc, char *argv[]) {
 
     wl_display_roundtrip(g_display);
     init_egl();
-    if (!load_font("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf", 128)) {
+    if (!load_font("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf", 48)) {
         wl_registry_destroy(registry);
         wl_display_disconnect(g_display);
         return 1;

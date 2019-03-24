@@ -37,7 +37,7 @@ GLuint font_texture;
 extern struct wl_display *g_display;
 EGLDisplay g_gl_display;
 EGLConfig g_gl_conf;
-EGLContext g_shared_ctx;
+EGLContext g_root_ctx;
 
 extern struct wl_compositor *g_compositor;
 extern struct xdg_wm_base *g_xdg_wm_base;
@@ -51,6 +51,8 @@ static const EGLint context_attribs[] = {EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE
 const struct wl_callback_listener frame_listener;
 static void frame_handle_done(void *data, struct wl_callback *callback, uint32_t time) {
     struct window *w = data;
+    if (!w->open)
+        return;
     wl_callback_destroy(callback);
     window_render(w);
 
@@ -129,8 +131,8 @@ void init_egl() {
 
     free(configs);
 
-    g_shared_ctx = eglCreateContext(g_gl_display, g_gl_conf, EGL_NO_CONTEXT, context_attribs);
-    eglMakeCurrent(g_gl_display, EGL_NO_SURFACE, EGL_NO_SURFACE, g_shared_ctx);
+    g_root_ctx = eglCreateContext(g_gl_display, g_gl_conf, EGL_NO_CONTEXT, context_attribs);
+    eglMakeCurrent(g_gl_display, EGL_NO_SURFACE, EGL_NO_SURFACE, g_root_ctx);
 }
 
 void kill_egl() {
@@ -139,10 +141,6 @@ void kill_egl() {
     eglReleaseThread();
 }
 
-/* float x2; */
-/* float y2; */
-/* float wi; */
-/* float h ; */
 
 bool load_font(const char *font_name, int height) {
     if (!ft && FT_Init_FreeType(&ft)) {
@@ -155,6 +153,7 @@ bool load_font(const char *font_name, int height) {
     }
     FT_Set_Pixel_Sizes(face, 0, height);
 
+    eglMakeCurrent(g_gl_display, EGL_NO_SURFACE, EGL_NO_SURFACE, g_root_ctx);
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
     /* glEnable(GL_CULL_FACE); */
@@ -222,7 +221,7 @@ struct window *window_create() {
     w->rotation_offset = timestamp();
 
     /* Share the context between windows */
-    w->gl_ctx = eglCreateContext(g_gl_display, g_gl_conf, g_shared_ctx, context_attribs);
+    w->gl_ctx = eglCreateContext(g_gl_display, g_gl_conf, g_root_ctx, context_attribs);
     /* if (active_window) { */
     /*         w->gl_ctx = eglCreateContext(g_gl_display, g_gl_conf, active_window->gl_ctx, context_attribs); */
     /* } else { */

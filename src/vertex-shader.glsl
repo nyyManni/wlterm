@@ -1,12 +1,14 @@
+#version 320 es
+
 uniform mat4 projection;
 uniform vec4 offset;
 uniform mat4 rotation;
-attribute vec4 pos;
-attribute vec4 color;
-varying vec4 v_color;
+
+layout (location = 0) in vec4 pos;
+layout (location = 1) in vec4 color;
+out vec4 v_color;
 
 void main() {
     gl_Position = projection * ((rotation * pos) + offset);
-    // gl_Position = projection * pos + offset;
     v_color = color;
 }

@@ -33,19 +33,24 @@ struct window {
     EGLSurface gl_surface;
 
     GLuint shader_program;
+    GLuint text_shader;
 
     /* Window contents. */
     uint32_t rotation_offset;
     GLuint rotation_uniform;
     GLuint offset_uniform;
     GLuint projection_uniform;
-    GLuint pos;
-    GLuint col;
+
+    GLuint projection_font_uniform;
+    GLuint color_uniform;
+    /* GLuint pos; */
+    /* GLuint col; */
 };
 
 
 void init_egl();
 void kill_egl();
+bool load_font(const char *, int);
 struct window *window_create();
 void window_close(struct window *);
 void window_render(struct window *);

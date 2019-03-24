@@ -20,8 +20,6 @@
 #include "xdg-shell-client-protocol.h"
 #include "egl_window.h"
 
-static int counter = 0;
-
 struct wl_display *g_display;
 struct wl_compositor *g_compositor;
 struct wl_seat *g_seat;
@@ -346,15 +344,19 @@ static const struct wl_registry_listener registry_listener = {
 
 
 int main(int argc, char *argv[]) {
-    memset(windows, 0, MAX_WINDOWS * sizeof(struct window *));
 
     g_display = wl_display_connect(NULL);
     struct wl_registry *registry = wl_display_get_registry(g_display);
     wl_registry_add_listener(registry, &registry_listener, NULL);
 
     wl_display_roundtrip(g_display);
-
     init_egl();
+    if (!load_font("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf", 512)) {
+        wl_registry_destroy(registry);
+        wl_display_disconnect(g_display);
+        return 1;
+    }
+    
     struct window *w = window_create();
 
     while (wl_display_dispatch(g_display) != -1 && open_windows) {}

@@ -4,6 +4,7 @@
 #include <ft2build.h>
 #include FT_FREETYPE_H
 
+#include <GL/gl.h>
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
 #include <GLES2/gl2.h>
@@ -18,8 +19,11 @@
 #include "egl_window.h"
 #include "xdg-shell-client-protocol.h"
 
-FT_Library FT;
 
+FT_Library ft = NULL;
+FT_Face face = NULL;
+
+GLuint font_texture;
 
 extern struct wl_display *g_display;
 EGLDisplay g_gl_display;
@@ -64,7 +68,6 @@ static void handle_toplevel_configure(void *data, struct xdg_toplevel *toplevel,
 
 static void handle_toplevel_close(void *data, struct xdg_toplevel *xdg_toplevel) {
     struct window *w = data;
-    /* close_window(w); */
     window_close(w);
 }
 
@@ -85,6 +88,7 @@ static struct xdg_surface_listener xdg_surface_listener = {
 
 
 void init_egl() {
+    memset(windows, 0, MAX_WINDOWS * sizeof(struct window *));
 
     EGLint config_attribs[] = {
         EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
@@ -106,8 +110,7 @@ void init_egl() {
     eglSwapInterval(g_gl_display, 0);
 
     for (i = 0; i < n; i++) {
-        eglGetConfigAttrib(g_gl_display,
-                   configs[i], EGL_BUFFER_SIZE, &size);
+        eglGetConfigAttrib(g_gl_display, configs[i], EGL_BUFFER_SIZE, &size);
         if (size == 32) {
             g_gl_conf = configs[i];
             break;
@@ -121,6 +124,39 @@ void kill_egl() {
 
     eglTerminate(g_gl_display);
     eglReleaseThread();
+}
+
+bool load_font(const char *font_name, int height) {
+    if (!ft && FT_Init_FreeType(&ft)) {
+        fprintf(stderr, "Could not init freetype library\n");
+        return false;
+    }
+    if (FT_New_Face(ft, font_name, 0, &face)) {
+        fprintf(stderr, "Could not init font\n");
+        return false;
+    }
+    FT_Set_Pixel_Sizes(face, 0, height);
+    /* FT_Load_Char(face, 'X', FT_LOAD_RENDER); */
+
+    /* glGenTextures(1, &font_texture); */
+    /* glBindTexture(GL_TEXTURE_2D, font_texture); */
+
+    /* glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, 256, 256, 0, GL_RED, GL_UNSIGNED_BYTE, */
+    /*              face->glyph->bitmap.buffer); */
+
+    /* glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); */
+    /* glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE); */
+
+    /* glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR); */
+    /* glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR); */
+
+
+    /* glBindTexture(GL_TEXTURE_2D, 0); */
+
+    /* FT_Done_Face(face); */
+    /* FT_Done_FreeType(ft); */
+
+    return true;
 }
 
 
@@ -169,6 +205,13 @@ struct window *window_create() {
     glAttachShader(w->shader_program, vert);
     glLinkProgram(w->shader_program);
 
+    GLuint font_vert = make_shader("src/font-vertex.glsl", GL_VERTEX_SHADER);
+    GLuint font_frag = make_shader("src/font-fragment.glsl", GL_FRAGMENT_SHADER);
+    w->text_shader = glCreateProgram();
+    glAttachShader(w->text_shader, font_vert);
+    glAttachShader(w->text_shader, font_frag);
+    glLinkProgram(w->text_shader);
+
     glGetProgramiv(w->shader_program, GL_LINK_STATUS, &status);
     if (!status) {
         char log[1000];
@@ -178,17 +221,19 @@ struct window *window_create() {
         exit(1);
     }
 
-    glUseProgram(w->shader_program);
 
-    w->pos = 0;
-    w->col = 1;
+    /* w->pos = 0; */
+    /* w->col = 1; */
 
-    glBindAttribLocation(w->shader_program, w->pos, "pos");
-    glBindAttribLocation(w->shader_program, w->col, "color");
+    /* glBindAttribLocation(w->shader_program, w->pos, "pos"); */
+    /* glBindAttribLocation(w->shader_program, w->col, "color"); */
 
     w->rotation_uniform = glGetUniformLocation(w->shader_program, "rotation");
     w->offset_uniform = glGetUniformLocation(w->shader_program, "offset");
     w->projection_uniform = glGetUniformLocation(w->shader_program, "projection");
+
+    w->projection_font_uniform = glGetUniformLocation(w->text_shader, "projection");
+    w->color_uniform = glGetUniformLocation(w->text_shader, "textColor");
 
     wl_display_roundtrip(g_display);
     wl_surface_commit(w->surface);
@@ -205,11 +250,12 @@ struct window *window_create() {
 
 void window_render(struct window *w) {
 
-
-    eglMakeCurrent(g_gl_display, w->gl_surface, w->gl_surface, w->gl_ctx);
-    /* fprintf(stderr, "drawing...\n"); */
     if (!w->open)
         return;
+
+    eglMakeCurrent(g_gl_display, w->gl_surface, w->gl_surface, w->gl_ctx);
+    glDisable(GL_BLEND);
+    /* fprintf(stderr, "drawing...\n"); */
 
     GLfloat verts[3][2] = {
         {w->width, 0},
@@ -258,15 +304,81 @@ void window_render(struct window *w) {
     glClearColor(0.0, 0.0, 0.0, 0.5);
     glClear(GL_COLOR_BUFFER_BIT);
 
-    glVertexAttribPointer(w->pos, 2, GL_FLOAT, GL_FALSE, 0, verts);
-    glVertexAttribPointer(w->col, 3, GL_FLOAT, GL_FALSE, 0, colors);
-    glEnableVertexAttribArray(w->pos);
-    glEnableVertexAttribArray(w->col);
+    /* glVertexAttribPointer(w->pos, 2, GL_FLOAT, GL_FALSE, 0, verts); */
+    /* glVertexAttribPointer(w->col, 3, GL_FLOAT, GL_FALSE, 0, colors); */
+    /* glEnableVertexAttribArray(w->pos); */
+    /* glEnableVertexAttribArray(w->col); */
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, verts);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, colors);
+    glEnableVertexAttribArray(0);
+    glEnableVertexAttribArray(1);
 
+    glUseProgram(w->shader_program);
     glDrawArrays(GL_TRIANGLES, 0, 3);
 
-    glDisableVertexAttribArray(w->pos);
-    glDisableVertexAttribArray(w->col);
+
+    glDisableVertexAttribArray(0);
+    glDisableVertexAttribArray(1);
+
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    glUseProgram(w->text_shader);
+    glUniformMatrix4fv(w->projection_font_uniform, 1, GL_FALSE, (GLfloat *) projection);
+    GLfloat color[3] = {1.0, 0.0, 0.0};
+    glUniform3fv(w->color_uniform, 1, (GLfloat *) color);
+
+    /* Draw some text */
+    GLuint vbo;
+    glGenBuffers(1, &vbo);
+    glEnableVertexAttribArray(0);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 0, 0);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+
+    FT_Load_Char(face, 0x00e4, FT_LOAD_RENDER);
+    FT_GlyphSlot g = face->glyph; 
+
+    /* glGenTextures(1, &font_texture); */
+    /* glBindTexture(GL_TEXTURE_2D, font_texture); */
+    glTexImage2D(
+      GL_TEXTURE_2D,
+      0,
+      GL_RED,
+      g->bitmap.width,
+      g->bitmap.rows,
+      0,
+      GL_RED,
+      GL_UNSIGNED_BYTE,
+      g->bitmap.buffer
+    );
+ 
+    int x = 100;
+    int y = 100;
+    float x2 = x + g->bitmap_left;
+    float y2 = -y - g->bitmap_top;
+    float wi = g->bitmap.width;
+    float h = g->bitmap.rows;
+ 
+    GLfloat box[4][4] = {
+        {x2,     y    , 0, 0},
+        {x2 + wi, y    , 1, 0},
+        {x2,     y + h, 0, 1},
+        {x2 + wi, y + h, 1, 1},
+    };
+ 
+    glBufferData(GL_ARRAY_BUFFER, sizeof box, box, GL_DYNAMIC_DRAW);
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+
+
+
+
     eglSwapBuffers(g_gl_display, w->gl_surface);
 
     wl_surface_commit(w->surface);

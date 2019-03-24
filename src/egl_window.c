@@ -18,7 +18,7 @@
 #include "egl_window.h"
 #include "xdg-shell-client-protocol.h"
 
-#define FONT_BUFFER_SIZE 8192
+#define FONT_BUFFER_SIZE 4096
 
 #define CHECK_ERROR                               \
     do {                                          \
@@ -35,7 +35,8 @@ FT_Face face = NULL;
 
 GLuint font_texture;
 
-struct glyph active_glyph;
+/* struct glyph active_glyph; */
+struct glyph glyph_map[254];
 mat4 text_projection;
 
 extern struct wl_display *g_display;
@@ -164,8 +165,8 @@ bool load_font(const char *font_name, int height) {
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    active_glyph.code = 0x00e4;
-    FT_Load_Char(face, active_glyph.code, FT_LOAD_RENDER);
+    /* active_glyph.code = 0x00e4; */
+    /* FT_Load_Char(face, active_glyph.code, FT_LOAD_RENDER); */
 
     glGenTextures(1, &font_texture);
     /* GLuint fbo; */
@@ -175,9 +176,8 @@ bool load_font(const char *font_name, int height) {
 
 
     FT_GlyphSlot g = face->glyph;
-    fprintf(stderr, "width: %u, height: %u\n", g->bitmap.width, g->bitmap.rows);
 
-    active_glyph.texture = font_texture;
+    /* active_glyph.texture = font_texture; */
     glTexImage2D(
       GL_TEXTURE_2D,
       0,
@@ -189,13 +189,42 @@ bool load_font(const char *font_name, int height) {
       GL_UNSIGNED_BYTE,
       0
     );
-    active_glyph.offset_x = 100.0 / FONT_BUFFER_SIZE;
-    active_glyph.offset_y = 100.0 / FONT_BUFFER_SIZE;
-    active_glyph.width = g->bitmap.width / (double)FONT_BUFFER_SIZE;
-    active_glyph.height = g->bitmap.rows / (double)FONT_BUFFER_SIZE;
+    /* active_glyph.offset_x = 100.0 / FONT_BUFFER_SIZE; */
+    /* active_glyph.offset_y = 100.0 / FONT_BUFFER_SIZE; */
+    /* active_glyph.width = g->bitmap.width / (double)FONT_BUFFER_SIZE; */
+    /* active_glyph.height = g->bitmap.rows / (double)FONT_BUFFER_SIZE; */
+    /* glTexSubImage2D(GL_TEXTURE_2D, 0, 100, 100, g->bitmap.width, g->bitmap.rows, */
+    /*                 GL_RED, GL_UNSIGNED_BYTE, g->bitmap.buffer); */
 
-    glTexSubImage2D(GL_TEXTURE_2D, 0, 100, 100, g->bitmap.width, g->bitmap.rows,
-                    GL_RED, GL_UNSIGNED_BYTE, g->bitmap.buffer);
+    int offset_x = 0, offset_y = 0, y_increment = 0;
+
+    for (unsigned int i = 0; i < 254; ++i) {
+        FT_Load_Char(face, i, FT_LOAD_RENDER);
+        FT_GlyphSlot g = face->glyph;
+
+        if (offset_x + g->bitmap.width > FONT_BUFFER_SIZE) {
+            offset_y += y_increment;
+            offset_x = 0;
+        }
+        
+        glTexSubImage2D(GL_TEXTURE_2D, 0, offset_x, offset_y, g->bitmap.width,
+                        g->bitmap.rows, GL_RED, GL_UNSIGNED_BYTE, g->bitmap.buffer);
+        y_increment = y_increment > g->bitmap.rows ? y_increment : g->bitmap.rows;
+
+        glyph_map[i].code = i;
+        glyph_map[i].texture = font_texture;
+        glyph_map[i].offset_x = (double)offset_x / FONT_BUFFER_SIZE;
+        glyph_map[i].offset_y = (double)offset_y / FONT_BUFFER_SIZE;
+        glyph_map[i].width = g->bitmap.width / (double)FONT_BUFFER_SIZE;
+        glyph_map[i].height = g->bitmap.rows / (double)FONT_BUFFER_SIZE;
+
+        glyph_map[i].bearing_x = g->bitmap_left;
+        glyph_map[i].bearing_y = g->bitmap_top;
+        glyph_map[i].advance = g->advance.x >> 6;
+
+        offset_x += g->bitmap.width;
+    }
+
 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
@@ -284,6 +313,33 @@ struct window *window_create() {
     return w;
 }
 
+
+void render_text(GLfloat *buf, const char *text, int x, int y) {
+    size_t n = strlen(text);
+
+    for (size_t i = 0; i < n; ++i) {
+        struct glyph g = glyph_map[text[i]];
+        GLfloat _w = g.width * FONT_BUFFER_SIZE;
+        GLfloat _h = g.height * FONT_BUFFER_SIZE;
+        GLfloat _x = x + g.bearing_x;
+        GLfloat _y = y - g.bearing_y;
+        GLfloat c[6][4] = {
+            {_x, _y, g.offset_x, g.offset_y},
+            {_x + _w, _y, g.offset_x + g.width, g.offset_y},
+            {_x, _y + _h, g.offset_x, g.offset_y + g.height},
+            
+            {_x, _y + _h, g.offset_x, g.offset_y + g.height},
+            {_x + _w, _y, g.offset_x + g.width, g.offset_y},
+            {_x + _w, _y + _h, g.offset_x + g.width, g.offset_y + g.height},
+        };
+        memcpy(&buf[i * 6 * 4 * sizeof(GLfloat)], &c, 6 * 4 * sizeof(GLfloat));
+
+        x += g.advance;
+
+    }
+}
+
+
 void window_render(struct window *w) {
 
     eglMakeCurrent(g_gl_display, w->gl_surface, w->gl_surface, w->gl_ctx);
@@ -312,44 +368,13 @@ void window_render(struct window *w) {
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
     glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 0, 0);
 
-    int x = 100;
-    int y = 100;
-
-    GLfloat _w = active_glyph.width * FONT_BUFFER_SIZE;
-    GLfloat _h = active_glyph.height * FONT_BUFFER_SIZE;
-
-    struct glyph g = active_glyph;
-    GLfloat box[1][6][4] = {{
-        /* {x     , y     , g.offset_x + g.width, 1 - g.offset_y}, */
-        /* {x + _w, y     , g.offset_x          , 1 - g.offset_y}, */
-        /* {x     , y + _h, g.offset_x + g.width, 1 - g.offset_y + g.height}, */
-
-        /* {x     , y + _h, g.offset_x + g.width, 1 - g.offset_y + g.height}, */
-        /* {x + _w, y     , g.offset_x          , 1 - g.offset_y}, */
-        /* {x + _w, y + _h, g.offset_x          , 1 - g.offset_y + g.height}, */
-
-        {x     , y     , g.offset_x          , g.offset_y},
-        {x + _w, y     , g.offset_x + g.width, g.offset_y},
-        {x     , y + _h, g.offset_x          , g.offset_y + g.height},
-
-        {x     , y + _h, g.offset_x          , g.offset_y + g.height},
-        {x + _w, y     , g.offset_x + g.width, g.offset_y},
-        {x + _w, y + _h, g.offset_x + g.width, g.offset_y + g.height},
-
-        /* {x     , y     , 0, 0}, */
-        /* {x + _w, y     , 1, 0}, */
-        /* {x     , y + _h, 0, 1}, */
-
-        /* {x     , y + _h, 0, 1}, */
-        /* {x + _w, y     , 1, 0}, */
-        /* {x + _w, y + _h, 1, 1}, */
-    }};
+    static GLfloat TEXT_DATA[128][6][4] = {0};
+    render_text((GLfloat *)TEXT_DATA, "lol", 100, 100);
 
  
-    glBufferData(GL_ARRAY_BUFFER, sizeof box, box, GL_DYNAMIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof TEXT_DATA, TEXT_DATA, GL_DYNAMIC_DRAW);
 
-    glDrawArrays(GL_TRIANGLES, 0, 12);
-
+    glDrawArrays(GL_TRIANGLES, 0, 12 * 6);
 
     glBindTexture(GL_TEXTURE_2D, 0);
     glDisableVertexAttribArray(0);

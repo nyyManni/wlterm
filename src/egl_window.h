@@ -49,6 +49,10 @@ struct glyph {
     GLfloat offset_y;
     GLfloat width;
     GLfloat height;
+
+    int advance;
+    int bearing_x;
+    int bearing_y;
 };
 
 

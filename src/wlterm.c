@@ -212,7 +212,6 @@ static const struct wl_touch_listener touch_listener = {
 static void keyboard_keymap(void *data, struct wl_keyboard *wl_keyboard, uint32_t format,
                             int32_t fd, uint32_t size) {
 
-    /* fprintf(stderr, "handling keymap\n"); */
     struct xkb_context *xkb_context = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
 
     if (format != WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1) {
@@ -250,27 +249,20 @@ static void keyboard_modifiers(void *data, struct wl_keyboard *keyboard, uint32_
                                uint32_t mods_depressed, uint32_t mods_latched,
                                uint32_t mods_locked, uint32_t group) {}
 
-/* void close_window(struct window *w); */
-/* struct window *create_window(); */
 
 static void keyboard_key(void *data, struct wl_keyboard *wl_keyboard, uint32_t serial,
                          uint32_t time, uint32_t key, uint32_t _key_state) {
-    /* struct window *w = data; */
     enum wl_keyboard_key_state key_state = _key_state;
     xkb_keysym_t sym = xkb_state_key_get_one_sym(g_xkb_state, key + 8);
-    /* fprintf(stderr, "handling keyinput\n"); */
 
     if (key_state != WL_KEYBOARD_KEY_STATE_PRESSED)
         return;
     if (sym == XKB_KEY_c) {
-        /* close_window(active_window); */
         window_close(active_window);
     } else if (sym == XKB_KEY_n) {
-        /* create_window(); */
         window_create();
 
     }
-    /* draw(active_window); */
 }
 
 static const struct wl_keyboard_listener keyboard_listener = {
@@ -351,7 +343,7 @@ int main(int argc, char *argv[]) {
 
     wl_display_roundtrip(g_display);
     init_egl();
-    if (!load_font("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf", 512)) {
+    if (!load_font("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf", 256)) {
         wl_registry_destroy(registry);
         wl_display_disconnect(g_display);
         return 1;

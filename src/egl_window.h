@@ -1,6 +1,8 @@
 #ifndef EGL_WINDOW_H
 #define EGL_WINDOW_H
 
+#include <ft2build.h>
+#include FT_FREETYPE_H
 #include <stdbool.h>
 
 #include <GLES2/gl2.h>
@@ -22,11 +24,9 @@ struct window {
     int width;
     int height;
 
-    /* bool resized; */
-    bool configured;
+    /* OpenGL */
     struct wl_egl_window *gl_window;
 
-    /* OpenGL */
     EGLContext gl_ctx;
     EGLConfig gl_conf;
     EGLDisplay gl_display;
@@ -36,15 +36,20 @@ struct window {
     GLuint text_shader;
 
     /* Window contents. */
-    uint32_t rotation_offset;
-    GLuint rotation_uniform;
-    GLuint offset_uniform;
-    GLuint projection_uniform;
 
-    GLuint projection_font_uniform;
+    GLuint projection_uniform;
     GLuint color_uniform;
-    /* GLuint pos; */
-    /* GLuint col; */
+    GLuint text_projection_uniform;
+};
+
+struct glyph {
+    FT_ULong code;
+    GLuint texture;
+
+    GLfloat offset_x;
+    GLfloat offset_y;
+    GLfloat width;
+    GLfloat height;
 };
 
 

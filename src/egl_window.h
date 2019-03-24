@@ -39,7 +39,6 @@ struct window {
 
     GLuint projection_uniform;
     GLuint color_uniform;
-    GLuint text_projection_uniform;
 };
 
 struct glyph {

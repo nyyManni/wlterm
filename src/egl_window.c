@@ -18,6 +18,8 @@
 #include "egl_window.h"
 #include "xdg-shell-client-protocol.h"
 
+#define FONT_BUFFER_SIZE 8192
+
 #define CHECK_ERROR                               \
     do {                                          \
         GLenum err = glGetError();                \
@@ -175,30 +177,22 @@ bool load_font(const char *font_name, int height) {
     FT_GlyphSlot g = face->glyph;
     fprintf(stderr, "width: %u, height: %u\n", g->bitmap.width, g->bitmap.rows);
 
-    glm_ortho(0.0, 1024, 1024, 0.0, 0.0, 1.0, text_projection);
-
     active_glyph.texture = font_texture;
     glTexImage2D(
       GL_TEXTURE_2D,
       0,
       GL_RED,
-      /* g->bitmap.width, */
-      /* 256, */
-      /* g->bitmap.rows, */
-      1024,
-      1024,
-      /* 320, */
-      /* 500, */
+      FONT_BUFFER_SIZE,
+      FONT_BUFFER_SIZE,
       0,
       GL_RED,
       GL_UNSIGNED_BYTE,
       0
-      /* g->bitmap.buffer */
     );
-    active_glyph.offset_x = 100.0 / 1024.0;
-    active_glyph.offset_y = 100.0 / 1024.0;
-    active_glyph.width = g->bitmap.width / 1024.0;
-    active_glyph.height = g->bitmap.rows / 1024.0;
+    active_glyph.offset_x = 100.0 / FONT_BUFFER_SIZE;
+    active_glyph.offset_y = 100.0 / FONT_BUFFER_SIZE;
+    active_glyph.width = g->bitmap.width / (double)FONT_BUFFER_SIZE;
+    active_glyph.height = g->bitmap.rows / (double)FONT_BUFFER_SIZE;
 
     glTexSubImage2D(GL_TEXTURE_2D, 0, 100, 100, g->bitmap.width, g->bitmap.rows,
                     GL_RED, GL_UNSIGNED_BYTE, g->bitmap.buffer);
@@ -210,8 +204,6 @@ bool load_font(const char *font_name, int height) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
     glBindTexture(GL_TEXTURE_2D, 0);
-
-    /* glBindFramebuffer(GL_FRAMEBUFFER, 0); */
 
     FT_Done_Face(face);
     FT_Done_FreeType(ft);
@@ -277,7 +269,6 @@ struct window *window_create() {
 
     w->projection_uniform = glGetUniformLocation(w->text_shader, "projection");
     w->color_uniform = glGetUniformLocation(w->text_shader, "textColor");
-    w->text_projection_uniform = glGetUniformLocation(w->text_shader, "textProjection");
 
     wl_display_roundtrip(g_display);
     wl_surface_commit(w->surface);
@@ -314,7 +305,6 @@ void window_render(struct window *w) {
     glUniformMatrix4fv(w->projection_uniform, 1, GL_FALSE, (GLfloat *) projection);
     GLfloat color[3] = {1.0, 0.3, 0.3};
     glUniform3fv(w->color_uniform, 1, (GLfloat *) color);
-    glUniformMatrix4fv(w->text_projection_uniform, 1, GL_FALSE, (GLfloat *) text_projection);
  
     GLuint vbo;
     glGenBuffers(1, &vbo);
@@ -325,8 +315,8 @@ void window_render(struct window *w) {
     int x = 100;
     int y = 100;
 
-    GLfloat _w = active_glyph.width * 1024;
-    GLfloat _h = active_glyph.height * 1024;
+    GLfloat _w = active_glyph.width * FONT_BUFFER_SIZE;
+    GLfloat _h = active_glyph.height * FONT_BUFFER_SIZE;
 
     struct glyph g = active_glyph;
     GLfloat box[1][6][4] = {{

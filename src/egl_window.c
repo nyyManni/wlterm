@@ -380,7 +380,8 @@ void window_render(struct window *w) {
     glBindTexture(GL_TEXTURE_2D, font_texture);
 
     glUniformMatrix4fv(w->projection_uniform, 1, GL_FALSE, (GLfloat *) projection);
-    glUniform2f(w->offset_uniform, 100, 100);
+    uint32_t t = timestamp();
+    glUniform2f(w->offset_uniform, 100 + sin(t / 100.0) * 100.0, 100 + cos(t / 100.0) * 100.0);
     GLfloat color[3] = {1.0, 0.3, 0.3};
     glUniform3fv(w->color_uniform, 1, (GLfloat *) color);
  

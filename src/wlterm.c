@@ -61,6 +61,7 @@ static void pointer_handle_enter(void *data, struct wl_pointer *pointer, uint32_
     /* } */
 }
 
+
 static void pointer_handle_leave(void *data, struct wl_pointer *pointer, uint32_t serial,
                                  struct wl_surface *surface) {}
 
@@ -343,7 +344,7 @@ int main(int argc, char *argv[]) {
 
     wl_display_roundtrip(g_display);
     init_egl();
-    if (!load_font("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf", 48)) {
+    if (!load_font("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf", 18 * 2)) {
         wl_registry_destroy(registry);
         wl_display_disconnect(g_display);
         return 1;

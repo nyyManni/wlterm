@@ -28,14 +28,26 @@
         }                                         \
     } while (0);
 
-int line_spacing = 50;
+int line_spacing = 18 * 2;
 
 FT_Library ft = NULL;
 FT_Face face = NULL;
 
 GLuint font_texture;
 
-/* struct glyph active_glyph; */
+
+int parse_color(const char *color, vec3 ret) {
+    
+    char buf[3] = {0};
+    for (int channel = 0; channel < 3; ++channel) {
+        memcpy(buf, &color[channel * 2], 2);
+        ret[channel] = strtol(buf, NULL, 16) / 255.0;
+    }
+
+
+    return 1;
+};
+
 struct glyph glyph_map[254];
 mat4 text_projection;
 
@@ -284,6 +296,7 @@ struct window *window_create() {
 
     w->projection_uniform = glGetUniformLocation(w->text_shader, "projection");
     w->color_uniform = glGetUniformLocation(w->text_shader, "textColor");
+    w->offset_uniform = glGetUniformLocation(w->text_shader, "offset");
 
     wl_display_roundtrip(g_display);
     wl_surface_commit(w->surface);
@@ -301,10 +314,11 @@ struct window *window_create() {
 
 
 void render_text(char *texts[], int nrows, int x, int y) {
-    static GLfloat text_data[128 * 6 * 4] = {0};
+    static GLfloat text_data[2048 * 6 * 4] = {0};
     int total = 0;
     int counter = 0;
     int orig_x = x;
+    unsigned int bufsize = 0;
     for (size_t j = 0; j < nrows; ++j) {
         const char *text = texts[j];
         size_t n = strlen(text);
@@ -328,22 +342,29 @@ void render_text(char *texts[], int nrows, int x, int y) {
                 {_x + _w, _y, g.offset_x + g.width, g.offset_y},
                 {_x + _w, _y + _h, g.offset_x + g.width, g.offset_y + g.height},
             };
-            memcpy(&text_data[counter * 6 * 4 * sizeof(GLfloat)], &c, 6 * 4 * sizeof(GLfloat));
+            memcpy(&text_data[counter * 6 * 4], &c, 6 * 4 * sizeof(GLfloat));
             counter++;
+
+            bufsize += sizeof(c);
 
             x += g.advance;
         }
         y += line_spacing;
         x = orig_x;
     }
-    glBufferData(GL_ARRAY_BUFFER, total * 24 * total * sizeof(GLfloat), text_data, GL_DYNAMIC_DRAW);
-    glDrawArrays(GL_TRIANGLES, 0, 32 * total);
+    glBufferData(GL_ARRAY_BUFFER, 24 * counter * sizeof(GLfloat), text_data, GL_DYNAMIC_DRAW);
+    glDrawArrays(GL_TRIANGLES, 0, 6 * counter);
 }
 
 
 void window_render(struct window *w) {
 
     eglMakeCurrent(g_gl_display, w->gl_surface, w->gl_surface, w->gl_ctx);
+
+    vec3 _color;
+    parse_color("0c1014", _color);
+    glClearColor(_color[0], _color[1], _color[2], 0.9);
+    glClear(GL_COLOR_BUFFER_BIT);
 
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -352,7 +373,6 @@ void window_render(struct window *w) {
     mat4 projection;
     glm_ortho(0.0, w->width * SCALE, w->height * SCALE, 0.0, -1.0, 1.0, projection);
 
-
     glActiveTexture(GL_TEXTURE0);
 
     glUseProgram(w->text_shader);
@@ -360,6 +380,7 @@ void window_render(struct window *w) {
     glBindTexture(GL_TEXTURE_2D, font_texture);
 
     glUniformMatrix4fv(w->projection_uniform, 1, GL_FALSE, (GLfloat *) projection);
+    glUniform2f(w->offset_uniform, 100, 100);
     GLfloat color[3] = {1.0, 0.3, 0.3};
     glUniform3fv(w->color_uniform, 1, (GLfloat *) color);
  
@@ -368,11 +389,13 @@ void window_render(struct window *w) {
     glEnableVertexAttribArray(0);
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
     glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 0, 0);
-    char *texts[2] = {0};
-    texts[0] = "lol";
-    texts[1] = "xd";
-    texts[2] = "oh boy";
-    render_text(texts, 3, 100, 100);
+    #define LINES 1
+    char *texts[LINES] = {0};
+    for (int i = 0; i < LINES; ++i) {
+        texts[i] = "The quick brown fox jumps over the lazy dog.";
+    }
+    
+    render_text(texts, LINES, 0, line_spacing);
 
     glBindTexture(GL_TEXTURE_2D, 0);
     glDisableVertexAttribArray(0);

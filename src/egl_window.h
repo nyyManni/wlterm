@@ -34,12 +34,24 @@ struct window {
 
     GLuint shader_program;
     GLuint text_shader;
+    GLuint bg_shader;
 
     /* Window contents. */
 
     GLuint projection_uniform;
+    GLuint bg_projection_uniform;
+    GLuint bg_accent_color_uniform;
     GLuint color_uniform;
     GLuint offset_uniform;
+    
+    
+
+    /* Scrolling stuff */
+    double position[2];
+    int32_t __position_pending[2];
+    double inertia[2]; /* Pixels per second */
+    uint32_t axis_time[2];
+    double velocity[2];
 };
 
 struct glyph {

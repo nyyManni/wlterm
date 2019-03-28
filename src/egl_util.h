@@ -29,6 +29,27 @@ static inline GLuint make_shader(char *filename, GLenum type) {
     free(src);
     return shader;
 }
+static inline GLuint create_program(char *vertex_shader, char *fragment_shader) {
+    GLuint vert = make_shader(vertex_shader, GL_VERTEX_SHADER);
+    GLuint frag = make_shader(fragment_shader, GL_FRAGMENT_SHADER);
+    GLuint shader = glCreateProgram();
+    glAttachShader(shader, vert);
+    glAttachShader(shader, frag);
+    glLinkProgram(shader);
+    glDeleteShader(vert);
+    glDeleteShader(frag);
+
+    GLint status;
+    glGetProgramiv(shader, GL_LINK_STATUS, &status);
+    if (!status) {
+        char log[1000];
+        GLsizei len;
+        glGetProgramInfoLog(shader, 1000, &len, log);
+        fprintf(stderr, "Error: linking:\n%*s\n", len, log);
+        exit(1);
+    }
+    return shader;
+}
 
 static inline uint32_t timestamp() {
 	struct timeval tv;

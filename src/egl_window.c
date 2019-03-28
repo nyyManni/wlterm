@@ -251,6 +251,10 @@ struct window *window_create() {
     w->width = 200;
     w->height = 200;
     w->open = true;
+    w->position[0] = 0.0;
+    w->position[1] = 0.0;
+    w->__position_pending[0] = 0;
+    w->__position_pending[1] = 0;
 
     /* Share the context between windows */
     w->gl_ctx = eglCreateContext(g_gl_display, g_gl_conf, g_root_ctx, context_attribs);
@@ -274,27 +278,14 @@ struct window *window_create() {
     eglMakeCurrent(g_gl_display, w->gl_surface, w->gl_surface, w->gl_ctx);
     eglSwapInterval(g_gl_display, 0);
 
-    GLint status;
 
-    GLuint font_vert = make_shader("src/font-vertex.glsl", GL_VERTEX_SHADER);
-    GLuint font_frag = make_shader("src/font-fragment.glsl", GL_FRAGMENT_SHADER);
-    w->text_shader = glCreateProgram();
-    glAttachShader(w->text_shader, font_vert);
-    glAttachShader(w->text_shader, font_frag);
-    glLinkProgram(w->text_shader);
-    glDeleteShader(font_vert);
-    glDeleteShader(font_frag);
+    w->bg_shader = create_program("src/bg-vertex.glsl", "src/bg-fragment.glsl");
+    w->text_shader = create_program("src/font-vertex.glsl", "src/font-fragment.glsl");
 
-    glGetProgramiv(w->shader_program, GL_LINK_STATUS, &status);
-    if (!status) {
-        char log[1000];
-        GLsizei len;
-        glGetProgramInfoLog(w->shader_program, 1000, &len, log);
-        fprintf(stderr, "Error: linking:\n%*s\n", len, log);
-        exit(1);
-    }
 
     w->projection_uniform = glGetUniformLocation(w->text_shader, "projection");
+    w->bg_projection_uniform = glGetUniformLocation(w->bg_shader, "projection");
+    w->bg_accent_color_uniform = glGetUniformLocation(w->bg_shader, "accentColor");
     w->color_uniform = glGetUniformLocation(w->text_shader, "textColor");
     w->offset_uniform = glGetUniformLocation(w->text_shader, "offset");
 
@@ -315,10 +306,15 @@ struct window *window_create() {
 
 void render_text(char *texts[], int nrows, int x, int y) {
     static GLfloat text_data[2048 * 6 * 4] = {0};
-    int total = 0;
-    int counter = 0;
+    static int done = false;
+
+    static int total = 0;
+    static int counter = 0;
     int orig_x = x;
-    unsigned int bufsize = 0;
+    static unsigned int bufsize = 0;
+    if (done) {
+        goto out;
+    }
     for (size_t j = 0; j < nrows; ++j) {
         const char *text = texts[j];
         size_t n = strlen(text);
@@ -352,6 +348,8 @@ void render_text(char *texts[], int nrows, int x, int y) {
         y += line_spacing;
         x = orig_x;
     }
+    done = true;
+ out:
     glBufferData(GL_ARRAY_BUFFER, 24 * counter * sizeof(GLfloat), text_data, GL_DYNAMIC_DRAW);
     glDrawArrays(GL_TRIANGLES, 0, 6 * counter);
 }
@@ -361,17 +359,46 @@ void window_render(struct window *w) {
 
     eglMakeCurrent(g_gl_display, w->gl_surface, w->gl_surface, w->gl_ctx);
 
+    mat4 projection;
+    glm_ortho(0.0, w->width * SCALE, w->height * SCALE, 0.0, -1.0, 1.0, projection);
+    glViewport(0, 0, w->width * SCALE, w->height * SCALE);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
     vec3 _color;
     parse_color("0c1014", _color);
     glClearColor(_color[0], _color[1], _color[2], 0.9);
     glClear(GL_COLOR_BUFFER_BIT);
+    
+    glUseProgram(w->bg_shader);
+    glEnableVertexAttribArray(0);
+    
+    GLuint vbo2;
+    glGenBuffers(1, &vbo2);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo2);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
+    
+    GLfloat linum_column[6][2] = {
+        {0, 0},
+        {100, 0},
+        {0, w->height * SCALE},
+        
+        {0, w->height * SCALE},
+        {100, 0},
+        {100, w->height * SCALE},
+    };
+    /* GLfloat bg_color[3] = {1.0, 0.3, 0.3}; */
+    vec3 bg_accent_color;
+    parse_color("11151c", bg_accent_color);
+    glUniform3fv(w->bg_accent_color_uniform, 1, (GLfloat *) bg_accent_color);
+    glUniformMatrix4fv(w->bg_projection_uniform, 1, GL_FALSE, (GLfloat *) projection);
+    glBufferData(GL_ARRAY_BUFFER, 12 * sizeof(GLfloat), (GLfloat *)linum_column, GL_DYNAMIC_DRAW);
+    
+    glDrawArrays(GL_TRIANGLES, 0, 6);
 
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glViewport(0, 0, w->width * SCALE, w->height * SCALE);
+    glDisableVertexAttribArray(0);
 
-    mat4 projection;
-    glm_ortho(0.0, w->width * SCALE, w->height * SCALE, 0.0, -1.0, 1.0, projection);
+
 
     glActiveTexture(GL_TEXTURE0);
 
@@ -380,8 +407,9 @@ void window_render(struct window *w) {
     glBindTexture(GL_TEXTURE_2D, font_texture);
 
     glUniformMatrix4fv(w->projection_uniform, 1, GL_FALSE, (GLfloat *) projection);
-    uint32_t t = timestamp();
-    glUniform2f(w->offset_uniform, 100 + sin(t / 100.0) * 100.0, 100 + cos(t / 100.0) * 100.0);
+    /* uint32_t t = timestamp(); */
+    /* glUniform2f(w->offset_uniform, 100 + sin(t / 200.0) * 100.0, 100 + cos(t / 200.0) * 100.0); */
+    glUniform2f(w->offset_uniform, w->position[1], w->position[0]);
     GLfloat color[3] = {1.0, 0.3, 0.3};
     glUniform3fv(w->color_uniform, 1, (GLfloat *) color);
  

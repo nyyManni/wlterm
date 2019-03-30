@@ -328,16 +328,16 @@ struct frame *frame_create() {
 
 void draw_text(char *texts[], int nrows, int x, int y, double scale) {
     static GLfloat text_data[2048 * 6 * 4] = {0};
-    static int done = false;
+    /* static int done = false; */
 
-    static int total = 0;
-    static int counter = 0;
+    int total = 0;
+    int counter = 0;
     y += line_spacing / scale;
     int orig_x = x;
-    static unsigned int bufsize = 0;
-    if (done) {
-        goto out;
-    }
+    unsigned int bufsize = 0;
+    /* if (done) { */
+    /*     goto out; */
+    /* } */
     for (size_t j = 0; j < nrows; ++j) {
         const char *text = texts[j];
         size_t n = strlen(text);
@@ -371,8 +371,8 @@ void draw_text(char *texts[], int nrows, int x, int y, double scale) {
         y += line_spacing / scale;
         x = orig_x;
     }
-    done = true;
- out:
+ /*    done = true; */
+ /* out: */
     glBufferData(GL_ARRAY_BUFFER, 24 * counter * sizeof(GLfloat), text_data, GL_DYNAMIC_DRAW);
     glDrawArrays(GL_TRIANGLES, 0, 6 * counter);
 }
@@ -488,6 +488,17 @@ void window_render(struct window *w) {
 
     
     draw_text(texts, LINES, 0, 0, w->frame->scale);
+
+    char *texts2[] = {
+        "1",
+        "2",
+        "3",
+        "4",
+        "5"
+    };
+    
+    glUniform2f(w->frame->offset_uniform, 30, w->position[0]);
+    draw_text(texts2, LINES, 0, 0, w->frame->scale);
 
     /* Modeline */
     draw_rect(0, w->height - 20, w->width, 20, "0a3749", w);

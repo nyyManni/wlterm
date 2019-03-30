@@ -8,10 +8,14 @@
 #include <GLES2/gl2.h>
 #include <EGL/egl.h>
 
-#define MAX_WINDOWS 64
+#include <cglm/mat4.h>
+
+#define MAX_FRAMES 64
 #define SCALE 2
 
-struct window {
+struct window;
+
+struct frame {
 
     struct wl_surface *surface;
     struct xdg_surface *xdg_surface;
@@ -33,10 +37,40 @@ struct window {
     EGLConfig gl_conf;
     EGLDisplay gl_display;
     EGLSurface gl_surface;
+    
+    mat4 projection;
 
     GLuint shader_program;
     GLuint text_shader;
     GLuint bg_shader;
+
+    
+    struct window *root_window;
+    
+
+
+    GLuint projection_uniform;
+    GLuint bg_projection_uniform;
+    GLuint bg_accent_color_uniform;
+    GLuint color_uniform;
+    GLuint offset_uniform;
+    
+    bool has_minibuffer_p;
+    int minibuffer_height;
+
+};
+
+struct window {
+    struct frame *frame;
+    
+    /* Window position in frame's coordinates */
+    int x;
+    int y;
+    
+    int width;
+    int height;
+    
+    int linum_width;
 
     /* Window contents. */
     GLuint linum_glyphs;
@@ -46,14 +80,10 @@ struct window {
     GLuint right_margin_glyphs;
     GLuint text_area_glyphs;
     GLuint modeline_glyphs;
+    
+    GLuint rect_vbo;
 
-    GLuint projection_uniform;
-    GLuint bg_projection_uniform;
-    GLuint bg_accent_color_uniform;
-    GLuint color_uniform;
-    GLuint offset_uniform;
-    
-    
+    mat4 projection;
 
     /* Scrolling stuff */
     double position[2];
@@ -81,8 +111,10 @@ struct glyph {
 void init_egl();
 void kill_egl();
 bool load_font(const char *, int);
-struct window *window_create();
-void window_close(struct window *);
-void window_render(struct window *);
+struct frame *frame_create();
+void frame_close(struct frame *);
+void frame_resize(struct frame *, int, int);
+struct window *window_create(struct frame *);
+void frame_render(struct frame *);
 
 #endif /* EGL_WINDOW_H */

@@ -23,6 +23,8 @@ struct window {
     bool open;
     int width;
     int height;
+    
+    double scale;
 
     /* OpenGL */
     struct wl_egl_window *gl_window;
@@ -37,6 +39,13 @@ struct window {
     GLuint bg_shader;
 
     /* Window contents. */
+    GLuint linum_glyphs;
+    GLuint left_fringe_glyphs;
+    GLuint right_fringe_glyphs;
+    GLuint left_margin_glyphs;
+    GLuint right_margin_glyphs;
+    GLuint text_area_glyphs;
+    GLuint modeline_glyphs;
 
     GLuint projection_uniform;
     GLuint bg_projection_uniform;

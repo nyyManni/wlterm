@@ -28,7 +28,7 @@
         }                                         \
     } while (0);
 
-int line_spacing = 18 * 2;
+int line_spacing = 18 * 2.0;
 
 FT_Library ft = NULL;
 FT_Face face = NULL;
@@ -91,7 +91,7 @@ static void handle_toplevel_configure(void *data, struct xdg_toplevel *toplevel,
         w->width = width;
         w->height = height;
     }
-    wl_egl_window_resize(w->gl_window, width * SCALE, height * SCALE, 0, 0);
+    wl_egl_window_resize(w->gl_window, width * w->scale, height * w->scale, 0, 0);
 }
 
 static void handle_toplevel_close(void *data, struct xdg_toplevel *xdg_toplevel) {
@@ -168,7 +168,7 @@ bool load_font(const char *font_name, int height) {
         fprintf(stderr, "Could not init font\n");
         return false;
     }
-    FT_Set_Pixel_Sizes(face, 0, height);
+    FT_Set_Pixel_Sizes(face, 0, height * 2.0);
 
     eglMakeCurrent(g_gl_display, EGL_NO_SURFACE, EGL_NO_SURFACE, g_root_ctx);
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
@@ -202,7 +202,7 @@ bool load_font(const char *font_name, int height) {
         FT_GlyphSlot g = face->glyph;
 
         if (offset_x + g->bitmap.width > FONT_BUFFER_SIZE) {
-            offset_y += y_increment;
+            offset_y += (y_increment + 1);
             offset_x = 0;
         }
         
@@ -221,7 +221,7 @@ bool load_font(const char *font_name, int height) {
         glyph_map[i].bearing_y = g->bitmap_top;
         glyph_map[i].advance = g->advance.x >> 6;
 
-        offset_x += g->bitmap.width;
+        offset_x += g->bitmap.width + 1;
     }
 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -251,6 +251,7 @@ struct window *window_create() {
     w->width = 200;
     w->height = 200;
     w->open = true;
+    w->scale = 2.0;
     w->position[0] = 0.0;
     w->position[1] = 0.0;
     w->__position_pending[0] = 0;
@@ -261,7 +262,7 @@ struct window *window_create() {
 
     w->surface = wl_compositor_create_surface(g_compositor);
     wl_surface_set_user_data(w->surface, w);
-    wl_surface_set_buffer_scale(w->surface, SCALE);
+    wl_surface_set_buffer_scale(w->surface, w->scale);
 
     w->gl_window = wl_egl_window_create(w->surface, 200, 200);
     w->gl_surface = platform_create_egl_surface(g_gl_display, g_gl_conf, w->gl_window, NULL);
@@ -282,6 +283,9 @@ struct window *window_create() {
     w->bg_shader = create_program("src/bg-vertex.glsl", "src/bg-fragment.glsl");
     w->text_shader = create_program("src/font-vertex.glsl", "src/font-fragment.glsl");
 
+    glGenBuffers(1, &w->linum_glyphs);
+    glGenBuffers(1, &w->text_area_glyphs);
+    glGenBuffers(1, &w->modeline_glyphs);
 
     w->projection_uniform = glGetUniformLocation(w->text_shader, "projection");
     w->bg_projection_uniform = glGetUniformLocation(w->bg_shader, "projection");
@@ -304,12 +308,13 @@ struct window *window_create() {
 }
 
 
-void render_text(char *texts[], int nrows, int x, int y) {
+void render_text(char *texts[], int nrows, int x, int y, double scale) {
     static GLfloat text_data[2048 * 6 * 4] = {0};
     static int done = false;
 
     static int total = 0;
     static int counter = 0;
+    y += line_spacing / scale;
     int orig_x = x;
     static unsigned int bufsize = 0;
     if (done) {
@@ -325,17 +330,17 @@ void render_text(char *texts[], int nrows, int x, int y) {
         for (size_t i = 0; i < n; ++i) {
             struct glyph g = glyph_map[text[i]];
             _g = &g;
-            GLfloat _w = g.width * FONT_BUFFER_SIZE;
-            GLfloat _h = g.height * FONT_BUFFER_SIZE;
-            GLfloat _x = x + g.bearing_x;
-            GLfloat _y = y - g.bearing_y;
+            GLfloat _w = (g.width * FONT_BUFFER_SIZE) / scale;
+            GLfloat _h = (g.height * FONT_BUFFER_SIZE) / scale;
+            GLfloat _x = (x + g.bearing_x / scale);
+            GLfloat _y = (y - g.bearing_y / scale);
             GLfloat c[6][4] = {
-                {_x, _y, g.offset_x, g.offset_y},
-                {_x + _w, _y, g.offset_x + g.width, g.offset_y},
-                {_x, _y + _h, g.offset_x, g.offset_y + g.height},
+                {_x, _y,           g.offset_x, g.offset_y},
+                {_x + _w, _y,      g.offset_x + g.width, g.offset_y},
+                {_x, _y + _h,      g.offset_x, g.offset_y + g.height},
 
-                {_x, _y + _h, g.offset_x, g.offset_y + g.height},
-                {_x + _w, _y, g.offset_x + g.width, g.offset_y},
+                {_x, _y + _h,      g.offset_x, g.offset_y + g.height},
+                {_x + _w, _y,      g.offset_x + g.width, g.offset_y},
                 {_x + _w, _y + _h, g.offset_x + g.width, g.offset_y + g.height},
             };
             memcpy(&text_data[counter * 6 * 4], &c, 6 * 4 * sizeof(GLfloat));
@@ -343,9 +348,9 @@ void render_text(char *texts[], int nrows, int x, int y) {
 
             bufsize += sizeof(c);
 
-            x += g.advance;
+            x += g.advance / scale;
         }
-        y += line_spacing;
+        y += line_spacing / scale;
         x = orig_x;
     }
     done = true;
@@ -360,14 +365,15 @@ void window_render(struct window *w) {
     eglMakeCurrent(g_gl_display, w->gl_surface, w->gl_surface, w->gl_ctx);
 
     mat4 projection;
-    glm_ortho(0.0, w->width * SCALE, w->height * SCALE, 0.0, -1.0, 1.0, projection);
-    glViewport(0, 0, w->width * SCALE, w->height * SCALE);
+    glm_ortho(0.0, w->width, w->height, 0.0, -1.0, 1.0, projection);
+    glViewport(0, 0, w->width * w->scale, w->height * w->scale);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
+    /* fprintf(stderr, "%f\n", w->height * 1.0); */
     vec3 _color;
     parse_color("0c1014", _color);
-    glClearColor(_color[0], _color[1], _color[2], 0.9);
+    glClearColor(_color[0], _color[1], _color[2], 1.0);
     glClear(GL_COLOR_BUFFER_BIT);
     
     glUseProgram(w->bg_shader);
@@ -381,11 +387,19 @@ void window_render(struct window *w) {
     GLfloat linum_column[6][2] = {
         {0, 0},
         {100, 0},
-        {0, w->height * SCALE},
+        {0, w->height},
         
-        {0, w->height * SCALE},
+        {0, w->height},
         {100, 0},
-        {100, w->height * SCALE},
+        {100, w->height},
+
+        /* {10 + 100, 10}, */
+        /* {20 + 100, 10}, */
+        /* {10 + 100, 28}, */
+        
+        /* {10 + 100, 28}, */
+        /* {20 + 100, 10}, */
+        /* {20 + 100, 28}, */
     };
     /* GLfloat bg_color[3] = {1.0, 0.3, 0.3}; */
     vec3 bg_accent_color;
@@ -409,6 +423,8 @@ void window_render(struct window *w) {
     glUniformMatrix4fv(w->projection_uniform, 1, GL_FALSE, (GLfloat *) projection);
     /* uint32_t t = timestamp(); */
     /* glUniform2f(w->offset_uniform, 100 + sin(t / 200.0) * 100.0, 100 + cos(t / 200.0) * 100.0); */
+    if (w->position[1] < 100) w->position[1] = 100;
+    if (w->position[0] < 0) w->position[0] = 0;
     glUniform2f(w->offset_uniform, w->position[1], w->position[0]);
     GLfloat color[3] = {1.0, 0.3, 0.3};
     glUniform3fv(w->color_uniform, 1, (GLfloat *) color);
@@ -418,13 +434,35 @@ void window_render(struct window *w) {
     glEnableVertexAttribArray(0);
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
     glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 0, 0);
-    #define LINES 1
-    char *texts[LINES] = {0};
-    for (int i = 0; i < LINES; ++i) {
-        texts[i] = "The quick brown fox jumps over the lazy dog.";
-    }
     
-    render_text(texts, LINES, 0, line_spacing);
+    char *texts[] = {
+        "def add(a: int, b: int) -> int:",
+        "    \"\"\" The main entry point. \"\"\"",
+        "    return a + b",
+        " ",
+        "main(3, 5)"
+    };
+    int LINES = 5;
+
+    /* #define LINES 1 */
+    /* char *texts[LINES] = {0}; */
+    /* for (int i = 0; i < LINES; ++i) { */
+    /*     texts[i] = "The quick brown fox jumps over the lazy dog."; */
+    /* } */
+    
+    render_text(texts, LINES, 0, 0, w->scale);//line_spacing);
+    
+    /* char *texts2[] = { */
+    /*     "1", */
+    /*     "2", */
+    /*     "3", */
+    /*     "4", */
+    /*     "5" */
+    /* }; */
+    
+    /* glUniform2f(w->offset_uniform, w->position[1], 0); */
+    /* render_text(texts2, LINES, 0, line_spacing); */
+
 
     glBindTexture(GL_TEXTURE_2D, 0);
     glDisableVertexAttribArray(0);

@@ -102,7 +102,7 @@ static void pointer_handle_axis(void *data, struct wl_pointer *wl_pointer, uint3
                                     (time - active_window->axis_time[axis]);
     active_window->axis_time[axis] = time;
     /* fprintf(stderr, "scroll scroll scroll\n"); */
-    fprintf(stderr, "x: %f, y: %f\n", active_window->position[0], active_window->position[1]);
+    /* fprintf(stderr, "x: %f, y: %f\n", active_window->position[0], active_window->position[1]); */
 
     /* Trigger a throttled redraw */
 }
@@ -263,7 +263,6 @@ static void keyboard_key(void *data, struct wl_keyboard *wl_keyboard, uint32_t s
         window_close(active_window);
     } else if (sym == XKB_KEY_n) {
         window_create();
-
     }
 }
 
@@ -311,10 +310,10 @@ static struct xdg_surface_listener xdg_surface_listener = {
 
 static void handle_global(void *data, struct wl_registry *registry, uint32_t name,
                           const char *interface, uint32_t version) {
+    /* fprintf(stderr, "register: %s\n", interface); */
 
     if (strcmp(interface, wl_compositor_interface.name) == 0) {
-        g_compositor =
-            wl_registry_bind(registry, name, &wl_compositor_interface, version);
+        g_compositor = wl_registry_bind(registry, name, &wl_compositor_interface, version);
 
     } else if (strcmp(interface, wl_seat_interface.name) == 0) {
         g_seat = wl_registry_bind(registry, name, &wl_seat_interface, version);
@@ -345,7 +344,7 @@ int main(int argc, char *argv[]) {
 
     wl_display_roundtrip(g_display);
     init_egl();
-    if (!load_font("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf", 18 * 2)) {
+    if (!load_font("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf", 15)) {
         wl_registry_destroy(registry);
         wl_display_disconnect(g_display);
         return 1;

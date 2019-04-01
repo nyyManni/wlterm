@@ -193,7 +193,12 @@ struct font *load_font(const char *font_name, int height) {
     glGenBuffers(1, &f->vertex_buffer);
     glBindBuffer(GL_ARRAY_BUFFER, f->vertex_buffer);
     /* glBufferData(GL_ARRAY_BUFFER, 254 * 6 * 4 * sizeof(GLfloat), NULL, GL_STATIC_READ); */
-    float buf[] = {1.0, 1.0, 1.0, 1.0};
+    float buf[] = {
+        0.0, 0.0, 0.0, 0.0,
+        0.0, 0.0, f->texture_size, f->texture_size,
+        /* 1.0, 1.0, 1.0, 1.0, */
+        /* 1.0, 1.0, 1.0, 1.0, */
+    };
     glBufferData(GL_ARRAY_BUFFER, sizeof(buf), buf, GL_STATIC_READ);
     /* glBufferSubData(GL_TEXTURE_BUFFER, 0, sizeof(buf), buf); */
 

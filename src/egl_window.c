@@ -192,24 +192,15 @@ struct font *load_font(const char *font_name, int height) {
 
     glGenBuffers(1, &f->vertex_buffer);
     glBindBuffer(GL_ARRAY_BUFFER, f->vertex_buffer);
-    /* glBufferData(GL_ARRAY_BUFFER, 254 * 6 * 4 * sizeof(GLfloat), NULL, GL_STATIC_READ); */
-    float buf[] = {
+    float _buf[] = {
         0.0, 0.0, 0.0, 0.0,
         0.0, 0.0, f->texture_size, f->texture_size,
         /* 1.0, 1.0, 1.0, 1.0, */
         /* 1.0, 1.0, 1.0, 1.0, */
     };
-    glBufferData(GL_ARRAY_BUFFER, sizeof(buf), buf, GL_STATIC_READ);
-    /* glBufferSubData(GL_TEXTURE_BUFFER, 0, sizeof(buf), buf); */
+    glBufferData(GL_ARRAY_BUFFER, sizeof(_buf), 0, GL_STATIC_READ);
 
-    glGenTextures(1, &f->vertex_texture);
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_BUFFER, f->vertex_texture);
-    glTexBuffer(GL_TEXTURE_BUFFER, GL_R32F, f->vertex_buffer);
     
-    
-
-    glActiveTexture(GL_TEXTURE0);
 
     int offset_x = 0, offset_y = 0, y_increment = 0;
 
@@ -222,6 +213,7 @@ struct font *load_font(const char *font_name, int height) {
             offset_x = 0;
         }
 
+        glActiveTexture(GL_TEXTURE0);
         glTexSubImage2D(GL_TEXTURE_2D, 0, offset_x, offset_y, g->bitmap.width,
                         g->bitmap.rows, GL_RED, GL_UNSIGNED_BYTE, g->bitmap.buffer);
         y_increment = y_increment > g->bitmap.rows ? y_increment : g->bitmap.rows;
@@ -260,8 +252,7 @@ struct font *load_font(const char *font_name, int height) {
 
 
         if (i == 'a') {
-
-
+            glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(_buf), _buf);
         }
     }
     font_texture = f->texture;
@@ -273,6 +264,12 @@ struct font *load_font(const char *font_name, int height) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
     glBindTexture(GL_TEXTURE_2D, 0);
+
+    glGenTextures(1, &f->vertex_texture);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_BUFFER, f->vertex_texture);
+    glTexBuffer(GL_TEXTURE_BUFFER, GL_R32F, f->vertex_buffer);
+
     glBindTexture(GL_TEXTURE_BUFFER, 0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 

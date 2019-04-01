@@ -376,19 +376,13 @@ void draw_text2(struct window *w, char *texts[], int nrows, int x, int y, double
     glBindVertexArray(vao);
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
 
-    float text_data[] = {
-        0.0f, 20.0f, 0,
-        16.0f, 20.0f, 0,
-        32.0f, 20.0f, 0, 
+    struct {float x; float y; int32_t k;} glyphs[] = {
+        {0.0f,  20.f, 'a'},
+        {12.0f, 20.f, 'b'},
+        {24.0f, 20.f, 'c'},
     };
-    int32_t charcode = 'a';
-    memcpy(&text_data[2], &charcode, 4);
-    charcode = 'b';
-    memcpy(&text_data[5], &charcode, 4);
-    charcode = 'c';
-    memcpy(&text_data[8], &charcode, 4);
 
-    glBufferData(GL_ARRAY_BUFFER, sizeof(text_data), &text_data, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(glyphs), &glyphs, GL_STATIC_DRAW);
 
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 12, 0);

@@ -18,8 +18,8 @@
 #include "egl_window.h"
 #include "xdg-shell-client-protocol.h"
 
-/* #define FONT_BUFFER_SIZE 4096 */
-#define FONT_BUFFER_SIZE 512
+#define FONT_BUFFER_SIZE 4096
+/* #define FONT_BUFFER_SIZE 512 */
 
 #define CHECK_ERROR                               \
     do {                                          \
@@ -192,13 +192,14 @@ struct font *load_font(const char *font_name, int height) {
 
     glGenBuffers(1, &f->vertex_buffer);
     glBindBuffer(GL_ARRAY_BUFFER, f->vertex_buffer);
-    float _buf[] = {
-        0.0, 0.0, 0.0, 0.0,
-        0.0, 0.0, f->texture_size, f->texture_size,
-        /* 1.0, 1.0, 1.0, 1.0, */
-        /* 1.0, 1.0, 1.0, 1.0, */
-    };
-    glBufferData(GL_ARRAY_BUFFER, sizeof(_buf), 0, GL_STATIC_READ);
+    /* float _buf[] = { */
+    /*     0.0, 0.0, 0.0, 0.0, */
+    /*     0.0, 0.0, f->texture_size, f->texture_size, */
+    /*     /\* 1.0, 1.0, 1.0, 1.0, *\/ */
+    /*     /\* 1.0, 1.0, 1.0, 1.0, *\/ */
+    /* }; */
+    /* glBufferData(GL_ARRAY_BUFFER, sizeof(_buf), 0, GL_STATIC_READ); */
+    glBufferData(GL_ARRAY_BUFFER, 254 * 6 * sizeof(GLfloat), 0, GL_STATIC_READ);
 
     
 
@@ -229,31 +230,35 @@ struct font *load_font(const char *font_name, int height) {
         glyph_map[i].bearing_y = g->bitmap_top;
         glyph_map[i].advance = g->advance.x >> 6;
 
-        struct glyph _g = glyph_map[i];
+        /* struct glyph _g = glyph_map[i]; */
 
-        int x, y = 0;
-        float scale = 2.0;
-        GLfloat _w = (_g.width * FONT_BUFFER_SIZE) / scale;
-        GLfloat _h = (_g.height * FONT_BUFFER_SIZE) / scale;
-        GLfloat _x = (x + _g.bearing_x / scale);
-        GLfloat _y = (y - _g.bearing_y / scale);
-        GLfloat buf[6][4] = {
-            {_x, _y,           _g.offset_x, _g.offset_y},
-            {_x + _w, _y,      _g.offset_x + _g.width, _g.offset_y},
-            {_x, _y + _h,      _g.offset_x, _g.offset_y + _g.height},
+        /* int x, y = 0; */
+        /* float scale = 2.0; */
+        /* GLfloat _w = (_g.width * FONT_BUFFER_SIZE) / scale; */
+        /* GLfloat _h = (_g.height * FONT_BUFFER_SIZE) / scale; */
+        /* GLfloat _x = (x + _g.bearing_x / scale); */
+        /* GLfloat _y = (y - _g.bearing_y / scale); */
+        /* GLfloat buf[6][4] = { */
+        /*     {_x, _y,           _g.offset_x, _g.offset_y}, */
+        /*     {_x + _w, _y,      _g.offset_x + _g.width, _g.offset_y}, */
+        /*     {_x, _y + _h,      _g.offset_x, _g.offset_y + _g.height}, */
 
-            {_x, _y + _h,      _g.offset_x, _g.offset_y + _g.height},
-            {_x + _w, _y,      _g.offset_x + _g.width, _g.offset_y},
-            {_x + _w, _y + _h, _g.offset_x + _g.width, _g.offset_y + _g.height},
-        };
+        /*     {_x, _y + _h,      _g.offset_x, _g.offset_y + _g.height}, */
+        /*     {_x + _w, _y,      _g.offset_x + _g.width, _g.offset_y}, */
+        /*     {_x + _w, _y + _h, _g.offset_x + _g.width, _g.offset_y + _g.height}, */
+        /* }; */
         /* glBufferSubData(GL_ARRAY_BUFFER, 6 * 4 * i, 6 * 4 * sizeof(GLfloat), &buf); */
 
-        offset_x += g->bitmap.width + 1;
-
-
         if (i == 'a') {
+            float _buf[] = {
+                offset_x, offset_y, g->bitmap.width, g->bitmap.rows,
+                g->bitmap_left, g->bitmap_top,
+                /* 0.0, 0.0, 512.0, 512.0 */
+            };
             glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(_buf), _buf);
         }
+        offset_x += g->bitmap.width + 1;
+
     }
     font_texture = f->texture;
 

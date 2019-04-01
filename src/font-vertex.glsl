@@ -14,6 +14,6 @@ out VS_OUT {
 } vs_out;
 
 void main() {
-    gl_Position = projection * vec4(vertex.xy + offset, 0.0, 1.0);
-    vs_out.glyph = 1;
+    gl_Position = vec4(vertex.xy + offset, 0.0, 1.0);
+    vs_out.glyph = 0;
 }

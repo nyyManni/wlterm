@@ -230,33 +230,11 @@ struct font *load_font(const char *font_name, int height) {
         glyph_map[i].bearing_y = g->bitmap_top;
         glyph_map[i].advance = g->advance.x >> 6;
 
-        /* struct glyph _g = glyph_map[i]; */
-
-        /* int x, y = 0; */
-        /* float scale = 2.0; */
-        /* GLfloat _w = (_g.width * FONT_BUFFER_SIZE) / scale; */
-        /* GLfloat _h = (_g.height * FONT_BUFFER_SIZE) / scale; */
-        /* GLfloat _x = (x + _g.bearing_x / scale); */
-        /* GLfloat _y = (y - _g.bearing_y / scale); */
-        /* GLfloat buf[6][4] = { */
-        /*     {_x, _y,           _g.offset_x, _g.offset_y}, */
-        /*     {_x + _w, _y,      _g.offset_x + _g.width, _g.offset_y}, */
-        /*     {_x, _y + _h,      _g.offset_x, _g.offset_y + _g.height}, */
-
-        /*     {_x, _y + _h,      _g.offset_x, _g.offset_y + _g.height}, */
-        /*     {_x + _w, _y,      _g.offset_x + _g.width, _g.offset_y}, */
-        /*     {_x + _w, _y + _h, _g.offset_x + _g.width, _g.offset_y + _g.height}, */
-        /* }; */
-        /* glBufferSubData(GL_ARRAY_BUFFER, 6 * 4 * i, 6 * 4 * sizeof(GLfloat), &buf); */
-
-        /* if (i == '4') { */
-            float _buf[] = {
-                offset_x, offset_y, g->bitmap.width, g->bitmap.rows,
-                g->bitmap_left, -g->bitmap_top,
-                /* 0.0, 0.0, 512.0, 512.0 */
-            };
-            glBufferSubData(GL_ARRAY_BUFFER, i * 6 * sizeof(GLuint), sizeof(_buf), _buf);
-        /* } */
+        float _buf[] = {
+            offset_x, offset_y, g->bitmap.width, g->bitmap.rows,
+            g->bitmap_left, -g->bitmap_top,
+        };
+        glBufferSubData(GL_ARRAY_BUFFER, i * 6 * sizeof(GLuint), sizeof(_buf), _buf);
         offset_x += g->bitmap.width + 1;
 
     }
@@ -399,15 +377,24 @@ void draw_text2(struct window *w, char *texts[], int nrows, int x, int y, double
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
 
     float text_data[] = {
-        0.0f, 100.0f,
-        600.0f, 100.0f,
-        1200.0f, 100.0f,
+        0.0f, 20.0f, 0,
+        16.0f, 20.0f, 0,
+        32.0f, 20.0f, 0, 
     };
+    int32_t charcode = 'a';
+    memcpy(&text_data[2], &charcode, 4);
+    charcode = 'b';
+    memcpy(&text_data[5], &charcode, 4);
+    charcode = 'c';
+    memcpy(&text_data[8], &charcode, 4);
 
     glBufferData(GL_ARRAY_BUFFER, sizeof(text_data), &text_data, GL_STATIC_DRAW);
 
     glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 12, 0);
+
+    glEnableVertexAttribArray(1);
+    glVertexAttribIPointer(1, 1, GL_INT, 12, (void *)8);
 
     glUseProgram(w->frame->text_shader);
     glUniformMatrix4fv(w->frame->projection_uniform, 1, GL_FALSE, (GLfloat *) w->projection);

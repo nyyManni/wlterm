@@ -9,18 +9,8 @@ uniform mat4 font_projection;
 
 uniform vec3 font_color;
 
-
 void main() {
-    // color = vec4(1.0, 1.0, 1.0, 1.0);
     vec2 coords = (font_projection * vec4(text_pos, 0.0, 1.0)).xy;
-    float c = 1.0 - texture(font_texture, coords).r;
-    color = vec4(c, c, c, 1.0);
-    // color =  vec4(text_pos, 1.0, 1.0);
-    // vec2 coords = (font_projection * vec4(text_pos, 0.0, 1.0)).xy;
-    // vec4 sampled = vec4(1.0, 1.0, 1.0, texture(font_texture, coords).r);
-    // // float r = texture(font_texture, text_pos).r;
-    // // color = vec4(r, r, r, 1.0);
-    // // vec4 sampled = vec4(1.0, 1.0, 1.0, texture(font_texture, text_pos).r);
-    // color = vec4(1.0, 1.0, 1.0, 1.0) * sampled;
-    // color = vec4(vec3(1.0, 1.0, 1.0) - vec3(color.xyz), color.w);
+    vec4 sampled = vec4(1.0, 1.0, 1.0, texture(font_texture, coords).r);
+    color = vec4(1.0, 1.0, 1.0, 1.0) * sampled;
 }

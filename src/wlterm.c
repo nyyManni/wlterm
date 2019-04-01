@@ -19,6 +19,7 @@
 
 #include "xdg-shell-client-protocol.h"
 #include "egl_window.h"
+#include "egl_util.h"
 
 struct wl_display *g_display;
 struct wl_compositor *g_compositor;
@@ -348,8 +349,11 @@ int main(int argc, char *argv[]) {
         wl_display_disconnect(g_display);
         return 1;
     }
+
+    uint32_t bufsize;
+    read_buffer_contents("src/wlterm.c", &bufsize);
     
-    struct frame *w = frame_create();
+    struct frame *f = frame_create();
 
     while (wl_display_dispatch(g_display) != -1 && open_frames) {}
     kill_egl();

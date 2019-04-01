@@ -130,3 +130,31 @@ char *read_file(const char *filename) {
     /* fprintf(stderr, buffer); */
     return buffer;
 }
+
+
+char **read_buffer_contents(const char *filename, uint32_t *len) {
+    char *file = read_file(filename);
+    
+    char *fp;
+    
+    /* Count the number of lines. */
+    *len = 1;
+    fp = &file[0] - 1;
+    while (*++fp) if (*fp == '\n') (*len)++;
+    
+    char **lines = malloc(*len * sizeof(char *));
+
+    char **lp = &lines[0];
+    *lp = &file[0];
+
+    fp = &file[0] - 1;
+    while (*++fp) {
+        if (*fp == '\n') {
+            *fp = '\0';
+            *++lp = fp + 1;
+        }
+    }
+
+    return lines;
+}
+

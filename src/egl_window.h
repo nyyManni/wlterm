@@ -50,6 +50,10 @@ struct frame {
 
 
     GLuint projection_uniform;
+    GLuint font_projection_uniform;
+    GLuint font_texture_uniform;
+    GLuint font_vertex_uniform;
+
     GLuint bg_projection_uniform;
     GLuint bg_accent_color_uniform;
     GLuint color_uniform;
@@ -107,10 +111,19 @@ struct glyph {
     int bearing_y;
 };
 
+struct font {
+    GLuint texture;
+    GLuint vertex_texture;
+    GLuint vertex_buffer;
+    mat4 texture_projection;
+    
+    int texture_size;
+};
+
 
 void init_egl();
 void kill_egl();
-bool load_font(const char *, int);
+struct font *load_font(const char *, int);
 struct frame *frame_create();
 void frame_close(struct frame *);
 void frame_resize(struct frame *, int, int);

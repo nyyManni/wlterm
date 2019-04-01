@@ -1,8 +1,9 @@
 #ifndef EGL_UTIL_H
 #define EGL_UTIL_H
+#include <stdio.h>
 #include <stdlib.h>
 #include <sys/time.h>
-#include <GLES2/gl2.h>
+#include <GLES3/gl32.h>
 #include <stdbool.h>
 #include <EGL/egl.h>
 
@@ -19,6 +20,7 @@ EGLSurface platform_create_egl_surface(EGLDisplay dpy, EGLConfig config,
 EGLBoolean platform_destroy_egl_surface(EGLDisplay display, EGLSurface surface);
 
 char *read_file(const char *filename);
+char **read_buffer_contents(const char *filename, uint32_t *);
 
 GLuint create_shader(const char *source, GLenum shader_type);
 
@@ -29,15 +31,24 @@ static inline GLuint make_shader(char *filename, GLenum type) {
     free(src);
     return shader;
 }
-static inline GLuint create_program(char *vertex_shader, char *fragment_shader) {
+static inline GLuint create_program(char *vertex_shader, char *fragment_shader,
+                                    char *geometry_shader) {
     GLuint vert = make_shader(vertex_shader, GL_VERTEX_SHADER);
     GLuint frag = make_shader(fragment_shader, GL_FRAGMENT_SHADER);
+    GLuint geo;
+    if (geometry_shader)
+        geo = make_shader(geometry_shader, GL_GEOMETRY_SHADER);
+
     GLuint shader = glCreateProgram();
     glAttachShader(shader, vert);
     glAttachShader(shader, frag);
+    if (geometry_shader)
+        glAttachShader(shader, geo);
     glLinkProgram(shader);
     glDeleteShader(vert);
     glDeleteShader(frag);
+    if (geometry_shader)
+        glDeleteShader(geo);
 
     GLint status;
     glGetProgramiv(shader, GL_LINK_STATUS, &status);

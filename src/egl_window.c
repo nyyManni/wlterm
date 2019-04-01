@@ -192,12 +192,18 @@ struct font *load_font(const char *font_name, int height) {
 
     glGenBuffers(1, &f->vertex_buffer);
     glBindBuffer(GL_ARRAY_BUFFER, f->vertex_buffer);
-    glBufferData(GL_ARRAY_BUFFER, 254 * 6 * 4 * sizeof(GLfloat), NULL, GL_STATIC_READ);
+    /* glBufferData(GL_ARRAY_BUFFER, 254 * 6 * 4 * sizeof(GLfloat), NULL, GL_STATIC_READ); */
+    float buf[] = {1.0, 1.0, 1.0, 1.0};
+    glBufferData(GL_ARRAY_BUFFER, sizeof(buf), buf, GL_STATIC_READ);
+    /* glBufferSubData(GL_TEXTURE_BUFFER, 0, sizeof(buf), buf); */
 
     glGenTextures(1, &f->vertex_texture);
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_BUFFER, f->vertex_texture);
-    glTexBuffer(GL_TEXTURE_BUFFER, GL_FLOAT, f->vertex_buffer);
+    glTexBuffer(GL_TEXTURE_BUFFER, GL_R32F, f->vertex_buffer);
+    
+    
+
     glActiveTexture(GL_TEXTURE0);
 
     int offset_x = 0, offset_y = 0, y_increment = 0;
@@ -243,7 +249,7 @@ struct font *load_font(const char *font_name, int height) {
             {_x + _w, _y,      _g.offset_x + _g.width, _g.offset_y},
             {_x + _w, _y + _h, _g.offset_x + _g.width, _g.offset_y + _g.height},
         };
-        glBufferSubData(GL_ARRAY_BUFFER, 6 * 4 * i, 6 * 4 * sizeof(GLfloat), &buf);
+        /* glBufferSubData(GL_ARRAY_BUFFER, 6 * 4 * i, 6 * 4 * sizeof(GLfloat), &buf); */
 
         offset_x += g->bitmap.width + 1;
 
@@ -378,13 +384,17 @@ void draw_text2(struct window *w, char *texts[], int nrows, int x, int y, double
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, active_font->texture);
 
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_BUFFER, active_font->vertex_texture);
+
+
     glBindVertexArray(vao);
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
 
     float text_data[] = {
         0.0f, 0.0f,
-        18.0f, 0.0f,
-        36.0f, 0.0f,
+        600.0f, 0.0f,
+        1200.0f, 0.0f,
     };
 
     glBufferData(GL_ARRAY_BUFFER, sizeof(text_data), &text_data, GL_STATIC_DRAW);
@@ -397,8 +407,10 @@ void draw_text2(struct window *w, char *texts[], int nrows, int x, int y, double
     glUniformMatrix4fv(w->frame->font_projection_uniform, 1, GL_FALSE,
                        (GLfloat *) active_font->texture_projection);
     glUniform2f(w->frame->offset_uniform, w->position[1] + w->linum_width, w->position[0]);
+    glUniform1i(w->frame->font_texture_uniform, 0);
+    glUniform1i(w->frame->font_vertex_uniform, 1);
 
-    glDrawArrays(GL_POINTS, 0, 1);
+    glDrawArrays(GL_POINTS, 0, 3);
     glBindVertexArray(0);
 }
 

@@ -249,14 +249,14 @@ struct font *load_font(const char *font_name, int height) {
         /* }; */
         /* glBufferSubData(GL_ARRAY_BUFFER, 6 * 4 * i, 6 * 4 * sizeof(GLfloat), &buf); */
 
-        if (i == 'a') {
+        /* if (i == '4') { */
             float _buf[] = {
                 offset_x, offset_y, g->bitmap.width, g->bitmap.rows,
-                g->bitmap_left, g->bitmap_top,
+                g->bitmap_left, -g->bitmap_top,
                 /* 0.0, 0.0, 512.0, 512.0 */
             };
-            glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(_buf), _buf);
-        }
+            glBufferSubData(GL_ARRAY_BUFFER, i * 6 * sizeof(GLuint), sizeof(_buf), _buf);
+        /* } */
         offset_x += g->bitmap.width + 1;
 
     }
@@ -399,9 +399,9 @@ void draw_text2(struct window *w, char *texts[], int nrows, int x, int y, double
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
 
     float text_data[] = {
-        0.0f, 0.0f,
-        600.0f, 0.0f,
-        1200.0f, 0.0f,
+        0.0f, 100.0f,
+        600.0f, 100.0f,
+        1200.0f, 100.0f,
     };
 
     glBufferData(GL_ARRAY_BUFFER, sizeof(text_data), &text_data, GL_STATIC_DRAW);

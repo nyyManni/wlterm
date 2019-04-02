@@ -13,11 +13,10 @@ out vec4 text_color;
 
 uniform mat4 projection;
 
-precision mediump samplerBuffer;
+precision highp samplerBuffer;
 uniform samplerBuffer font_vertices;
 
-// uniform float font_scale;
-float font_scale = 1.75;
+uniform float font_scale;
 
 
 void main() {

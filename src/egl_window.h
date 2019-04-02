@@ -54,10 +54,10 @@ struct frame {
     GLuint font_projection_uniform;
     GLuint font_texture_uniform;
     GLuint font_vertex_uniform;
+    GLuint font_scale_uniform;
 
     GLuint bg_projection_uniform;
     GLuint bg_accent_color_uniform;
-    GLuint color_uniform;
     GLuint offset_uniform;
     
     bool has_minibuffer_p;

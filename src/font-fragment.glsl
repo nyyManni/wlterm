@@ -1,14 +1,12 @@
 #version 320 es
 
-precision mediump float;
+precision highp float;
 in vec2 text_pos;
 in vec4 text_color;
 out vec4 color;
 
 uniform sampler2D font_texture;
 uniform mat4 font_projection;
-
-uniform vec3 font_color;
 
 void main() {
     vec2 coords = (font_projection * vec4(text_pos, 0.0, 1.0)).xy;

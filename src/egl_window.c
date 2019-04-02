@@ -123,7 +123,7 @@ void init_egl() {
         EGL_ALPHA_SIZE, 1,
         EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
         EGL_SAMPLE_BUFFERS, 1,
-        EGL_SAMPLES, 4,  // This is for 4x MSAA.
+        /* EGL_SAMPLES, 4,  // This is for 4x MSAA. */
         EGL_NONE
     };
     g_gl_display = platform_get_egl_display(EGL_PLATFORM_WAYLAND_KHR, g_display, NULL);
@@ -253,8 +253,8 @@ void frame_resize(struct frame *f, int width, int height) {
     wl_egl_window_resize(f->gl_window, width * f->scale, height * f->scale, 0, 0);
     glm_ortho(0.0, f->width, f->height, 0.0, -1.0, 1.0, f->projection);
 
-    f->root_window->width = width - 100;
-    f->root_window->height = height - f->minibuffer_height - 100;
+    f->root_window->width = width;
+    f->root_window->height = height - f->minibuffer_height;
 }
 
 
@@ -278,13 +278,13 @@ struct frame *frame_create() {
     f->root_window->width = f->width;
     f->root_window->height = f->height - f->minibuffer_height;
     f->root_window->frame = f;
-    f->root_window->x = 100;
-    f->root_window->y = 100;
+    f->root_window->x = 0;
+    f->root_window->y = 0;
     f->root_window->position[0] = 0.0;
     f->root_window->position[1] = 0.0;
     f->root_window->__position_pending[0] = 0;
     f->root_window->__position_pending[1] = 0;
-    f->root_window->linum_width = 50;
+    f->root_window->linum_width = 0;
     f->root_window->contents = NULL;
 
     /* Share the context between frames */
@@ -325,14 +325,13 @@ struct frame *frame_create() {
     f->font_projection_uniform = glGetUniformLocation(f->text_shader, "font_projection");
     f->font_vertex_uniform = glGetUniformLocation(f->text_shader, "font_vertices");
     f->font_texture_uniform = glGetUniformLocation(f->text_shader, "font_texure");
+    f->font_scale_uniform = glGetUniformLocation(f->text_shader, "font_scale");
+    f->offset_uniform = glGetUniformLocation(f->text_shader, "offset");
     glUniform1i(f->font_texture_uniform, 0);
     glUniform1i(f->font_vertex_uniform, 1);
 
     f->bg_projection_uniform = glGetUniformLocation(f->bg_shader, "projection");
     f->bg_accent_color_uniform = glGetUniformLocation(f->bg_shader, "accentColor");
-
-    f->color_uniform = glGetUniformLocation(f->text_shader, "font_color");
-    f->offset_uniform = glGetUniformLocation(f->text_shader, "offset");
 
     wl_display_roundtrip(g_display);
     wl_surface_commit(f->surface);
@@ -347,6 +346,7 @@ struct frame *frame_create() {
     frame_render(f);
     return f;
 }
+
 void draw_text(int x, int y, char *text, size_t len, struct font *font, 
                uint32_t color, struct window *w, bool flush) {
     
@@ -432,30 +432,6 @@ void draw_line(int x1, int y1, int x2, int y2, char *color_, struct window *win)
     glDisableVertexAttribArray(0);
 }
 
-/* void draw_line_numbers(struct window *w, int n) { */
-/*     int ncols = ceil(log10(n + 1)); */
-/*     int col_width = active_font->horizontal_advances['8']; */
-
-/*     w->linum_width = col_width * (ncols + 2);  /\* Empty column on both sides. *\/ */
-
-/*     /\* Line number column *\/ */
-/*     draw_rect(0, 0, w->linum_width, w->height, "11151c", w); */
-    
-/*     char fmt[10] = {0}; */
-/*     sprintf(fmt, "%%%dd", ncols); */
-/*     char buf[36]; */
-
-/*     for (int i = 0; i < w->nlines; ++i) { */
-/*         int vscroll_lines = i * active_font->vertical_advance; */
-/*         if (vscroll_lines < -w->position[0] - active_font->vertical_advance) continue; */
-/*         if (vscroll_lines > -w->position[0] + (w->height + active_font->vertical_advance)) break; */
-/*         int _n = sprintf(buf, fmt, i + 1); */
-/*         draw_text(-w->linum_width - w->position[1], active_font->vertical_advance * (i + 1), buf, _n, */
-/*                   active_font, 0xffffffff /\* color *\/, w, false /\* flush *\/); */
-/*     } */
-/*     draw_text(0, 0, "", 0, */
-/*               active_font, 0xffffffff /\* color *\/, w, true /\* flush *\/); */
-/* } */
 
 static inline void set_region(struct frame *f, int x, int y, int w, int h) {
     /* glScissor wants the botton-left corner of the area, the origin being in
@@ -479,7 +455,7 @@ void window_render(struct window *w) {
               w->height + (w->frame->height - w->height - w->x), -w->y,
               -1.0, 1.0, w->projection);
 
-    int modeline_h = 20;
+    int modeline_h = active_font->vertical_advance;
     vec3 _color;
     parse_color("0c1014", _color);
     glClearColor(_color[0], _color[1], _color[2], 1.0);
@@ -527,6 +503,7 @@ void window_render(struct window *w) {
     glUseProgram(w->frame->text_shader);
     glUniformMatrix4fv(w->frame->projection_uniform, 1, GL_FALSE, (GLfloat *) w->projection);
     glUniformMatrix4fv(w->frame->font_projection_uniform, 1, GL_FALSE, (GLfloat *) font->texture_projection);
+    glUniform1f(w->frame->font_scale_uniform, w->frame->scale);
     glUniform2f(w->frame->offset_uniform, w->position[1] + w->linum_width, w->position[0]);
     glUniform1i(w->frame->font_texture_uniform, 0);
     glUniform1i(w->frame->font_vertex_uniform, 1);
@@ -573,7 +550,12 @@ void frame_render(struct frame *f) {
     glViewport(0, 0, f->width * f->scale, f->height * f->scale);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
+    
+    set_region(f, 0, f->height - f->minibuffer_height, f->width, f->minibuffer_height);
+    vec3 _color;
+    parse_color("0c1014", _color);
+    glClearColor(_color[0], _color[1], _color[2], 1.0);
+    glClear(GL_COLOR_BUFFER_BIT);
 
     window_render(f->root_window);
 

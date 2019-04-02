@@ -5,9 +5,11 @@ layout (triangle_strip, max_vertices = 6) out;
 
 in VS_OUT {
     int glyph;
+    vec4 color;
 } gs_in[];
 
 out vec2 text_pos;
+out vec4 text_color;
 
 uniform mat4 projection;
 
@@ -17,6 +19,7 @@ uniform samplerBuffer font_vertices;
 float scale = 1.75;
 
 void main() {
+    text_color = gs_in[0].color;
     int _offset = 6 * gs_in[0].glyph;
     vec2 text_offset = vec2(texelFetch(font_vertices, _offset + 0).r,
                             texelFetch(font_vertices, _offset + 1).r);
@@ -40,7 +43,7 @@ void main() {
     gl_Position = projection * (gl_in[0].gl_Position + (bearing + vec4(0.0, text_size.y , 0.0, 0.0)) / scale);
     text_pos = text_offset + vec2(0.0, text_size.y);
     EmitVertex();
-    
+
 
     // Bottom right triangle
     // TR

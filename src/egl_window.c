@@ -376,19 +376,22 @@ void draw_text2(struct window *w, char *texts[], int nrows, int x, int y, double
     glBindVertexArray(vao);
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
 
-    struct {float x; float y; int32_t k;} glyphs[] = {
-        {0.0f,  20.f, 'a'},
-        {12.0f, 20.f, 'b'},
-        {24.0f, 20.f, 'c'},
+    struct {float x; float y; uint32_t c; int32_t k;} glyphs[] = {
+        {0.0f,  20.f, 0xffffffff, 'a'},
+        {12.0f, 20.f, 0xff0000ff, 'b'},
+        {24.0f, 20.f, 0x0000ffff, 'c'},
     };
 
     glBufferData(GL_ARRAY_BUFFER, sizeof(glyphs), &glyphs, GL_STATIC_DRAW);
 
     glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 12, 0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 16, 0);
 
     glEnableVertexAttribArray(1);
-    glVertexAttribIPointer(1, 1, GL_INT, 12, (void *)8);
+    glVertexAttribIPointer(1, 4, GL_UNSIGNED_BYTE, 16, (void *)8);
+
+    glEnableVertexAttribArray(2);
+    glVertexAttribIPointer(2, 1, GL_INT, 16, (void *)12);
 
     glUseProgram(w->frame->text_shader);
     glUniformMatrix4fv(w->frame->projection_uniform, 1, GL_FALSE, (GLfloat *) w->projection);

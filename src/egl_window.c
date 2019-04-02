@@ -542,6 +542,7 @@ void window_render(struct window *w) {
         if (vscroll_lines > -w->position[0] + (w->height + active_font->vertical_advance)) break;
         int _n = sprintf(buf, "%*d", ncols, i + 1);
         draw_text(col_width, active_font->vertical_advance * (i + 1), buf, _n,
+                  /* active_font, 0x888888ff /\* color *\/, w, false /\* flush *\/); */
                   active_font, 0x0a3749ff /* color */, w, false /* flush */);
     }
     draw_text(0, 0, "", 0, active_font, 0, w, true /* flush */);
@@ -549,27 +550,33 @@ void window_render(struct window *w) {
     glDisableVertexAttribArray(0);
     glDisableVertexAttribArray(1);
     glDisableVertexAttribArray(2);
+    glBindVertexArray(0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
 
     /* Overlays */
     glUseProgram(w->frame->overlay_shader);
     glUniformMatrix4fv(w->frame->overlay_projection_uniform, 1, GL_FALSE, (GLfloat *) w->projection);
     glUniform2f(w->frame->overlay_offset_uniform, w->position[1] + w->linum_width, w->position[0]);
 
-    set_region(w->frame, w->x, w->y, w->width, w->height);
+    set_region(w->frame, w->x + w->linum_width, w->y,
+               w->width - w->linum_width, w->height - modeline_h);
 
     GLuint vbo;
+    GLuint _vao;
+    glGenVertexArrays(1, &_vao);
+    glBindVertexArray(_vao);
     glGenBuffers(1, &vbo);
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 12, 0);
     glEnableVertexAttribArray(1);
-    glVertexAttribIPointer(0, 2, GL_FLOAT, 12, (void *)8);
+    glVertexAttribIPointer(1, 4, GL_UNSIGNED_BYTE, 12, (void *)8);
     glLineWidth(2.0 * w->frame->scale);
     struct gl_overlay_vertex overlays[] = {
-        {300.0, 324.0, 0xffffffff}, 
-        {600.0, 324.0, 0xffffffff},
-        {300.0, 424.0, 0xffffffff}, 
-        {800.0, 424.0, 0xffffffff},
+        {12 * col_width, 15 * active_font->vertical_advance, 0xc23127ff},
+        {23 * col_width, 15 * active_font->vertical_advance, 0xc23127ff},
+        {3 * col_width, 30 * active_font->vertical_advance, 0xc23127ff}, 
+        {15 * col_width, 30 * active_font->vertical_advance, 0xc23127ff},
     };
     glBufferData(GL_ARRAY_BUFFER, sizeof(overlays), (GLfloat *)overlays, GL_DYNAMIC_DRAW);
     glDrawArrays(GL_LINES, 0, 4);

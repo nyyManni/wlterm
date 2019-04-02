@@ -353,33 +353,6 @@ void draw_text(int x, int y, char *text, size_t len, struct font *font,
     static struct gl_glyph glyphs[MAX_GLYPHS_PER_DRAW];
     static int glyph_count = 0;
 
-    GLuint vao;
-    glGenVertexArrays(1, &vao);
-    glBindVertexArray(vao);
-
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, font->texture);
-
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_BUFFER, font->vertex_texture);
-
-    glBindBuffer(GL_ARRAY_BUFFER, w->text_area_glyphs);
-
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 16, 0);
-
-    glEnableVertexAttribArray(1);
-    glVertexAttribIPointer(1, 4, GL_UNSIGNED_BYTE, 16, (void *)8);
-
-    glEnableVertexAttribArray(2);
-    glVertexAttribIPointer(2, 1, GL_INT, 16, (void *)12);
-
-    glUseProgram(w->frame->text_shader);
-    glUniformMatrix4fv(w->frame->projection_uniform, 1, GL_FALSE, (GLfloat *) w->projection);
-    glUniformMatrix4fv(w->frame->font_projection_uniform, 1, GL_FALSE, (GLfloat *) font->texture_projection);
-    glUniform2f(w->frame->offset_uniform, w->position[1] + w->linum_width, w->position[0]);
-    glUniform1i(w->frame->font_texture_uniform, 0);
-    glUniform1i(w->frame->font_vertex_uniform, 1);
 
     int base_x = x;
     for (size_t i = 0; i < len; ++i) {
@@ -407,8 +380,6 @@ void draw_text(int x, int y, char *text, size_t len, struct font *font,
         glyph_count = 0;
     }
 
-    glBindVertexArray(0);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
 
@@ -461,98 +432,30 @@ void draw_line(int x1, int y1, int x2, int y2, char *color_, struct window *win)
     glDisableVertexAttribArray(0);
 }
 
-void draw_line_numbers(struct window *w, int n) {
-    int ncols = ceil(log10(n + 1));
-    int col_width = active_font->horizontal_advances['8'];
+/* void draw_line_numbers(struct window *w, int n) { */
+/*     int ncols = ceil(log10(n + 1)); */
+/*     int col_width = active_font->horizontal_advances['8']; */
 
-    w->linum_width = col_width * (ncols + 2);  /* Empty column on both sides. */
+/*     w->linum_width = col_width * (ncols + 2);  /\* Empty column on both sides. *\/ */
 
-    /* Line number column */
-    draw_rect(0, 0, w->linum_width, w->height, "11151c", w);
+/*     /\* Line number column *\/ */
+/*     draw_rect(0, 0, w->linum_width, w->height, "11151c", w); */
     
-    char fmt[10] = {0};
-    sprintf(fmt, "%%%dd", ncols);
-    char buf[36];
+/*     char fmt[10] = {0}; */
+/*     sprintf(fmt, "%%%dd", ncols); */
+/*     char buf[36]; */
 
-    for (int i = 0; i < w->nlines; ++i) {
-        int vscroll_lines = i * active_font->vertical_advance;
-        if (vscroll_lines < -w->position[0] - active_font->vertical_advance) continue;
-        if (vscroll_lines > -w->position[0] + (w->height + active_font->vertical_advance)) break;
-        /* memset(buf, 0, 36); */
-        int _n = sprintf(buf, fmt, i + 1);
-        /* int _n = sprintf(buf, "%5d", i + 1); */
-        draw_text(-w->linum_width - w->position[1], active_font->vertical_advance * (i + 1), buf, _n,
-                  active_font, 0xffffffff /* color */, w, false /* flush */);
-    }
-    draw_text(0, 0, "", 0,
-              active_font, 0xffffffff /* color */, w, true /* flush */);
-    /* for  */
-    /* glActiveTexture(GL_TEXTURE0); */
-    /* glBindTexture(GL_TEXTURE_2D, font_texture); */
-
-    /* glUseProgram(w->frame->text_shader); */
-
-    /* vec3 text_color; */
-    /* parse_color("0a3749", text_color); */
-    /* glUniform2f(w->frame->offset_uniform, 30, w->position[0]); */
-    /* glUniform3fv(w->frame->color_uniform, 1, text_color); */
-
-    /* glBindBuffer(GL_ARRAY_BUFFER, w->linum_glyphs); */
-    /* glEnableVertexAttribArray(0); */
-    /* glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 0, 0); */
-
-    /* int nglyphs = 0; */
-    /* for (int i = 1; i <= n; ++i) { */
-    /*     nglyphs += ceil(log10(i + 1)); */
-    /* } */
-
-    /* GLfloat *buf = malloc(nglyphs * 24 * sizeof(GLfloat)); */
-
-    /* for (int l = 1; l <= n; ++l) { */
-    /*     int offset_x = 0; */
-    /*     for (int e = ncols; e; --e) { */
-    /*         if (l >= pow(10, e)) { */
-    /*             int d = (l % (int)pow(10, e + 1) / (int)pow(10, e)) + 48; */
-
-    /*             struct glyph g = glyph_map[d]; */
-
-    /*             GLfloat _w = (g.width * FONT_BUFFER_SIZE) / scale; */
-    /*             GLfloat _h = (g.height * FONT_BUFFER_SIZE) / scale; */
-    /*             GLfloat _x = (x + g.bearing_x / scale); */
-    /*             GLfloat _y = (y - g.bearing_y / scale); */
-    /*             GLfloat c[6][4] = { */
-    /*                 {_x, _y,           g.offset_x, g.offset_y}, */
-    /*                 {_x + _w, _y,      g.offset_x + g.width, g.offset_y}, */
-    /*                 {_x, _y + _h,      g.offset_x, g.offset_y + g.height}, */
-
-    /*                 {_x, _y + _h,      g.offset_x, g.offset_y + g.height}, */
-    /*                 {_x + _w, _y,      g.offset_x + g.width, g.offset_y}, */
-    /*                 {_x + _w, _y + _h, g.offset_x + g.width, g.offset_y + g.height}, */
-    /*             }; */
-    /*             memcpy(&text_data[counter * 6 * 4], &c, 6 * 4 * sizeof(GLfloat)); */
-
-
-
-
-
-
-    /*         } */
-    /*         offset_x += 9; */
-    /*     } */
-    /*     /\* int offset_x = 0; *\/ */
-
-    /*     /\* for (int b = ceil(log10(l))) *\/ */
-
-
-    /* } */
-
-
-    /* glBufferData(GL_ARRAY_BUFFER, 24 * sizeof(GLfloat) *nglyphs, buf, GL_DYNAMIC_DRAW); */
-    /* glDrawArrays(GL_TRIANGLES, 0, 6 * nglyphs); */
-
-    /* glDisableVertexAttribArray(0); */
-    /* glActiveTexture(0); */
-}
+/*     for (int i = 0; i < w->nlines; ++i) { */
+/*         int vscroll_lines = i * active_font->vertical_advance; */
+/*         if (vscroll_lines < -w->position[0] - active_font->vertical_advance) continue; */
+/*         if (vscroll_lines > -w->position[0] + (w->height + active_font->vertical_advance)) break; */
+/*         int _n = sprintf(buf, fmt, i + 1); */
+/*         draw_text(-w->linum_width - w->position[1], active_font->vertical_advance * (i + 1), buf, _n, */
+/*                   active_font, 0xffffffff /\* color *\/, w, false /\* flush *\/); */
+/*     } */
+/*     draw_text(0, 0, "", 0, */
+/*               active_font, 0xffffffff /\* color *\/, w, true /\* flush *\/); */
+/* } */
 
 static inline void set_region(struct frame *f, int x, int y, int w, int h) {
     /* glScissor wants the botton-left corner of the area, the origin being in
@@ -576,21 +479,57 @@ void window_render(struct window *w) {
               w->height + (w->frame->height - w->height - w->x), -w->y,
               -1.0, 1.0, w->projection);
 
+    int modeline_h = 20;
     vec3 _color;
     parse_color("0c1014", _color);
     glClearColor(_color[0], _color[1], _color[2], 1.0);
     glClear(GL_COLOR_BUFFER_BIT);
 
-    draw_line_numbers(w, w->nlines);
-
     /* Modeline */
-    draw_rect(0, w->height - 20, w->width, 20, "0a3749", w);
+    draw_rect(0, w->height - modeline_h, w->width, modeline_h, "0a3749", w);
+
+    int ncols = ceil(log10(w->nlines + 1));
+    int col_width = active_font->horizontal_advances['8'];
+
+    w->linum_width = col_width * (ncols + 2);  /* Empty column on both sides. */
+
+    /* Line number column */
+    draw_rect(0, 0, w->linum_width, w->height - modeline_h, "11151c", w);
 
     set_region(w->frame, w->x + w->linum_width, w->y,
-               w->width - w->linum_width, w->height - 20);
+               w->width - w->linum_width, w->height - modeline_h);
 
     /* Fill column indicator*/
-    draw_line(400 + w->position[1], 0, 400 + w->position[1], w->height, "0a3749", w);
+    draw_line(79 * col_width + w->position[1], 0, 79 * col_width + w->position[1], w->height, "0a3749", w);
+
+    struct font *font = active_font;
+    GLuint vao;
+    glGenVertexArrays(1, &vao);
+    glBindVertexArray(vao);
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, font->texture);
+
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_BUFFER, font->vertex_texture);
+
+    glBindBuffer(GL_ARRAY_BUFFER, w->text_area_glyphs);
+
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 16, 0);
+
+    glEnableVertexAttribArray(1);
+    glVertexAttribIPointer(1, 4, GL_UNSIGNED_BYTE, 16, (void *)8);
+
+    glEnableVertexAttribArray(2);
+    glVertexAttribIPointer(2, 1, GL_INT, 16, (void *)12);
+
+    glUseProgram(w->frame->text_shader);
+    glUniformMatrix4fv(w->frame->projection_uniform, 1, GL_FALSE, (GLfloat *) w->projection);
+    glUniformMatrix4fv(w->frame->font_projection_uniform, 1, GL_FALSE, (GLfloat *) font->texture_projection);
+    glUniform2f(w->frame->offset_uniform, w->position[1] + w->linum_width, w->position[0]);
+    glUniform1i(w->frame->font_texture_uniform, 0);
+    glUniform1i(w->frame->font_vertex_uniform, 1);
 
     if (w->contents) {
         for (int i = 0; i < w->nlines; ++i) {
@@ -602,8 +541,27 @@ void window_render(struct window *w) {
         }
         draw_text(0.0, 0.0, "", 0,
                   active_font, 0xffffffff /* color */, w, true /* flush */);
-
     }
+
+    set_region(w->frame, w->x, w->y, w->linum_width, w->height - modeline_h);
+    glUniform2f(w->frame->offset_uniform, 0.0, w->position[0]);
+    char fmt[10] = {0};
+    sprintf(fmt, "%%%dd", ncols);
+    char buf[36];
+
+    for (int i = 0; i < w->nlines; ++i) {
+        int vscroll_lines = i * active_font->vertical_advance;
+        if (vscroll_lines < -w->position[0] - active_font->vertical_advance) continue;
+        if (vscroll_lines > -w->position[0] + (w->height + active_font->vertical_advance)) break;
+        int _n = sprintf(buf, fmt, i + 1);
+        draw_text(col_width, active_font->vertical_advance * (i + 1), buf, _n,
+                  active_font, 0x0a3749ff /* color */, w, false /* flush */);
+    }
+    draw_text(0, 0, "", 0,
+              active_font, 0xffffffff /* color */, w, true /* flush */);
+
+    glBindVertexArray(0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
 
     glDisable(GL_SCISSOR_TEST);
 }

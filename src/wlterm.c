@@ -120,7 +120,8 @@ static void pointer_handle_frame(void *data, struct wl_pointer *wl_pointer) {
         /*     active_window->velocity[axis] = 0.0; */
         /* } */
 
-        active_frame->root_window->position[axis] += active_frame->root_window->__position_pending[axis] / 250.0;
+        double delta = active_frame->root_window->__position_pending[axis] / 250.0;
+        active_frame->root_window->position[axis] += delta;
 
         /* while (active_window->position[axis] < 0) */
         /*     active_window->position[axis] += 800; */
@@ -350,7 +351,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    
+
     struct frame *f = frame_create();
 
     /* f->root_window->contents = read_buffer_contents("src/wlterm.c", &f->root_window->nlines); */

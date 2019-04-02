@@ -171,7 +171,7 @@ struct font *load_font(const char *font_name, int height) {
         return NULL;
     }
     FT_Set_Pixel_Sizes(face, 0, height * 2.0);
-    
+
     f->vertical_advance = face->size->metrics.height >> (6 + 1);
 
     eglMakeCurrent(g_gl_display, EGL_NO_SURFACE, EGL_NO_SURFACE, g_root_ctx);
@@ -309,9 +309,17 @@ struct frame *frame_create() {
     eglMakeCurrent(g_gl_display, f->gl_surface, f->gl_surface, f->gl_ctx);
     eglSwapInterval(g_gl_display, 0);
 
-    f->bg_shader = create_program("src/bg-vertex.glsl", "src/bg-fragment.glsl", NULL);
-    f->text_shader = create_program("src/font-vertex.glsl", "src/font-fragment.glsl",
+    f->bg_shader = create_program("src/bg-vertex.glsl",
+                                  "src/bg-fragment.glsl",
+                                  NULL);
+    f->text_shader = create_program("src/font-vertex.glsl",
+                                    "src/font-fragment.glsl",
                                     "src/font-geometry.glsl");
+    f->overlay_shader = create_program("src/overlay-vertex.glsl",
+                                       "src/overlay-fragment.glsl",
+                                       "src/overlay-geometry.glsl");
+
+    glEnable(GL_SCISSOR_TEST);
 
     glGenBuffers(1, &f->root_window->linum_glyphs);
     glGenBuffers(1, &f->root_window->modeline_glyphs);
@@ -329,6 +337,10 @@ struct frame *frame_create() {
     f->offset_uniform = glGetUniformLocation(f->text_shader, "offset");
     glUniform1i(f->font_texture_uniform, 0);
     glUniform1i(f->font_vertex_uniform, 1);
+    
+    f->overlay_projection_uniform = glGetUniformLocation(f->overlay_shader, "projection");
+    f->overlay_offset_uniform = glGetUniformLocation(f->overlay_shader, "offset");
+
 
     f->bg_projection_uniform = glGetUniformLocation(f->bg_shader, "projection");
     f->bg_accent_color_uniform = glGetUniformLocation(f->bg_shader, "accentColor");
@@ -347,9 +359,9 @@ struct frame *frame_create() {
     return f;
 }
 
-void draw_text(int x, int y, char *text, size_t len, struct font *font, 
+void draw_text(int x, int y, char *text, size_t len, struct font *font,
                uint32_t color, struct window *w, bool flush) {
-    
+
     static struct gl_glyph glyphs[MAX_GLYPHS_PER_DRAW];
     static int glyph_count = 0;
 
@@ -374,7 +386,7 @@ void draw_text(int x, int y, char *text, size_t len, struct font *font,
         x += font->horizontal_advances[text[i]];
     }
 
-    if (flush) {
+    if (flush && glyph_count) {
         glBufferSubData(GL_ARRAY_BUFFER, 0, glyph_count * sizeof(struct gl_glyph), glyphs);
         glDrawArrays(GL_POINTS, 0, glyph_count);
         glyph_count = 0;
@@ -446,7 +458,6 @@ void window_render(struct window *w) {
     if (w->position[0] > 0) w->position[0] = 0;
 
     /* Prevent changing anything outside the window. */
-    glEnable(GL_SCISSOR_TEST);
 
     set_region(w->frame, w->x, w->y, w->width, w->height);
 
@@ -508,6 +519,7 @@ void window_render(struct window *w) {
     glUniform1i(w->frame->font_texture_uniform, 0);
     glUniform1i(w->frame->font_vertex_uniform, 1);
 
+    /* Draw buffer text. */
     if (w->contents) {
         for (int i = 0; i < w->nlines; ++i) {
             int vscroll_lines = i * active_font->vertical_advance;
@@ -516,31 +528,55 @@ void window_render(struct window *w) {
             draw_text(0.0, active_font->vertical_advance * (i + 1), w->contents[i], strlen(w->contents[i]),
                   active_font, 0xffffffff /* color */, w, false /* flush */);
         }
-        draw_text(0.0, 0.0, "", 0,
-                  active_font, 0xffffffff /* color */, w, true /* flush */);
+        draw_text(0.0, 0.0, "", 0, active_font, 0, w, true /* flush */);
     }
 
     set_region(w->frame, w->x, w->y, w->linum_width, w->height - modeline_h);
     glUniform2f(w->frame->offset_uniform, 0.0, w->position[0]);
-    char fmt[10] = {0};
-    sprintf(fmt, "%%%dd", ncols);
     char buf[36];
 
+    /* Draw line numbers */
     for (int i = 0; i < w->nlines; ++i) {
         int vscroll_lines = i * active_font->vertical_advance;
         if (vscroll_lines < -w->position[0] - active_font->vertical_advance) continue;
         if (vscroll_lines > -w->position[0] + (w->height + active_font->vertical_advance)) break;
-        int _n = sprintf(buf, fmt, i + 1);
+        int _n = sprintf(buf, "%*d", ncols, i + 1);
         draw_text(col_width, active_font->vertical_advance * (i + 1), buf, _n,
                   active_font, 0x0a3749ff /* color */, w, false /* flush */);
     }
-    draw_text(0, 0, "", 0,
-              active_font, 0xffffffff /* color */, w, true /* flush */);
+    draw_text(0, 0, "", 0, active_font, 0, w, true /* flush */);
+
+    glDisableVertexAttribArray(0);
+    glDisableVertexAttribArray(1);
+    glDisableVertexAttribArray(2);
+
+    /* Overlays */
+    glUseProgram(w->frame->overlay_shader);
+    glUniformMatrix4fv(w->frame->overlay_projection_uniform, 1, GL_FALSE, (GLfloat *) w->projection);
+    glUniform2f(w->frame->overlay_offset_uniform, w->position[1] + w->linum_width, w->position[0]);
+
+    set_region(w->frame, w->x, w->y, w->width, w->height);
+
+    GLuint vbo;
+    glGenBuffers(1, &vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 12, 0);
+    glEnableVertexAttribArray(1);
+    glVertexAttribIPointer(0, 2, GL_FLOAT, 12, (void *)8);
+    glLineWidth(2.0 * w->frame->scale);
+    struct gl_overlay_vertex overlays[] = {
+        {300.0, 324.0, 0xffffffff}, 
+        {600.0, 324.0, 0xffffffff},
+        {300.0, 424.0, 0xffffffff}, 
+        {800.0, 424.0, 0xffffffff},
+    };
+    glBufferData(GL_ARRAY_BUFFER, sizeof(overlays), (GLfloat *)overlays, GL_DYNAMIC_DRAW);
+    glDrawArrays(GL_LINES, 0, 4);
 
     glBindVertexArray(0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 
-    glDisable(GL_SCISSOR_TEST);
 }
 
 void frame_render(struct frame *f) {
@@ -550,7 +586,7 @@ void frame_render(struct frame *f) {
     glViewport(0, 0, f->width * f->scale, f->height * f->scale);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    
+
     set_region(f, 0, f->height - f->minibuffer_height, f->width, f->minibuffer_height);
     vec3 _color;
     parse_color("0c1014", _color);

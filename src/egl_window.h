@@ -44,6 +44,7 @@ struct frame {
     GLuint shader_program;
     GLuint text_shader;
     GLuint bg_shader;
+    GLuint overlay_shader;
 
     
     struct window *root_window;
@@ -55,6 +56,9 @@ struct frame {
     GLuint font_texture_uniform;
     GLuint font_vertex_uniform;
     GLuint font_scale_uniform;
+    
+    GLuint overlay_projection_uniform;
+    GLuint overlay_offset_uniform;
 
     GLuint bg_projection_uniform;
     GLuint bg_accent_color_uniform;
@@ -131,6 +135,7 @@ struct font {
 
 
 struct gl_glyph {GLfloat x; GLfloat y; GLuint c; GLint k;};
+struct gl_overlay_vertex {GLfloat x; GLfloat y; GLuint c;};
 
 void init_egl();
 void kill_egl();

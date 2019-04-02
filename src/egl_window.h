@@ -12,6 +12,7 @@
 
 #define MAX_FRAMES 64
 #define SCALE 2
+#define MAX_GLYPHS_PER_DRAW 4096
 
 struct window;
 
@@ -95,6 +96,9 @@ struct window {
     double inertia[2]; /* Pixels per second */
     uint32_t axis_time[2];
     double velocity[2];
+    
+    
+    char *contents;
 };
 
 struct glyph {
@@ -118,8 +122,14 @@ struct font {
     mat4 texture_projection;
     
     int texture_size;
+    
+    int vertical_advance;
+    
+    int horizontal_advances[254];
 };
 
+
+struct gl_glyph {GLfloat x; GLfloat y; GLuint c; GLint k;};
 
 void init_egl();
 void kill_egl();

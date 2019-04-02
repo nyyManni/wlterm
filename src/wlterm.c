@@ -344,17 +344,17 @@ int main(int argc, char *argv[]) {
 
     wl_display_roundtrip(g_display);
     init_egl();
-    /* if (!load_font("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf", 15)) { */
-    if (!load_font("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf", 18)) {
+    if (!load_font("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf", 15)) {
         wl_registry_destroy(registry);
         wl_display_disconnect(g_display);
         return 1;
     }
 
     uint32_t bufsize;
-    read_buffer_contents("src/wlterm.c", &bufsize);
     
     struct frame *f = frame_create();
+
+    f->root_window->contents = read_file("src/wlterm.c");
 
     while (wl_display_dispatch(g_display) != -1 && open_frames) {}
     kill_egl();

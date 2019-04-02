@@ -50,7 +50,7 @@ int parse_color(const char *color, vec3 ret) {
     return 1;
 };
 
-struct glyph glyph_map[254];
+/* struct glyph glyph_map[254]; */
 mat4 text_projection;
 
 extern struct wl_display *g_display;
@@ -171,6 +171,8 @@ struct font *load_font(const char *font_name, int height) {
         return NULL;
     }
     FT_Set_Pixel_Sizes(face, 0, height * 2.0);
+    
+    f->vertical_advance = face->size->metrics.height >> (6 + 1);
 
     eglMakeCurrent(g_gl_display, EGL_NO_SURFACE, EGL_NO_SURFACE, g_root_ctx);
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
@@ -192,16 +194,7 @@ struct font *load_font(const char *font_name, int height) {
 
     glGenBuffers(1, &f->vertex_buffer);
     glBindBuffer(GL_ARRAY_BUFFER, f->vertex_buffer);
-    /* float _buf[] = { */
-    /*     0.0, 0.0, 0.0, 0.0, */
-    /*     0.0, 0.0, f->texture_size, f->texture_size, */
-    /*     /\* 1.0, 1.0, 1.0, 1.0, *\/ */
-    /*     /\* 1.0, 1.0, 1.0, 1.0, *\/ */
-    /* }; */
-    /* glBufferData(GL_ARRAY_BUFFER, sizeof(_buf), 0, GL_STATIC_READ); */
     glBufferData(GL_ARRAY_BUFFER, 254 * 6 * sizeof(GLfloat), 0, GL_STATIC_READ);
-
-    
 
     int offset_x = 0, offset_y = 0, y_increment = 0;
 
@@ -219,16 +212,7 @@ struct font *load_font(const char *font_name, int height) {
                         g->bitmap.rows, GL_RED, GL_UNSIGNED_BYTE, g->bitmap.buffer);
         y_increment = y_increment > g->bitmap.rows ? y_increment : g->bitmap.rows;
 
-        glyph_map[i].code = i;
-        glyph_map[i].texture = font_texture;
-        glyph_map[i].offset_x = (double)offset_x / FONT_BUFFER_SIZE;
-        glyph_map[i].offset_y = (double)offset_y / FONT_BUFFER_SIZE;
-        glyph_map[i].width = g->bitmap.width / (double)FONT_BUFFER_SIZE;
-        glyph_map[i].height = g->bitmap.rows / (double)FONT_BUFFER_SIZE;
-
-        glyph_map[i].bearing_x = g->bitmap_left;
-        glyph_map[i].bearing_y = g->bitmap_top;
-        glyph_map[i].advance = g->advance.x >> 6;
+        f->horizontal_advances[i] = g->advance.x >> (6 + 1);
 
         float _buf[] = {
             offset_x, offset_y, g->bitmap.width, g->bitmap.rows,
@@ -301,6 +285,7 @@ struct frame *frame_create() {
     f->root_window->__position_pending[0] = 0;
     f->root_window->__position_pending[1] = 0;
     f->root_window->linum_width = 50;
+    f->root_window->contents = NULL;
 
     /* Share the context between frames */
     f->gl_ctx = eglCreateContext(g_gl_display, g_gl_conf, g_root_ctx, context_attribs);
@@ -324,15 +309,17 @@ struct frame *frame_create() {
     eglMakeCurrent(g_gl_display, f->gl_surface, f->gl_surface, f->gl_ctx);
     eglSwapInterval(g_gl_display, 0);
 
-
     f->bg_shader = create_program("src/bg-vertex.glsl", "src/bg-fragment.glsl", NULL);
     f->text_shader = create_program("src/font-vertex.glsl", "src/font-fragment.glsl",
                                     "src/font-geometry.glsl");
 
     glGenBuffers(1, &f->root_window->linum_glyphs);
-    glGenBuffers(1, &f->root_window->text_area_glyphs);
     glGenBuffers(1, &f->root_window->modeline_glyphs);
+    glGenBuffers(1, &f->root_window->text_area_glyphs);
 
+    glBindBuffer(GL_ARRAY_BUFFER, f->root_window->text_area_glyphs);
+    glBufferData(GL_ARRAY_BUFFER, MAX_GLYPHS_PER_DRAW * sizeof(struct gl_glyph), 0, GL_STATIC_DRAW);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
 
     f->projection_uniform = glGetUniformLocation(f->text_shader, "projection");
     f->font_projection_uniform = glGetUniformLocation(f->text_shader, "font_projection");
@@ -360,29 +347,23 @@ struct frame *frame_create() {
     frame_render(f);
     return f;
 }
-void draw_text2(struct window *w, char *texts[], int nrows, int x, int y, double scale) {
+void draw_text(int x, int y, char *text, struct font *font, 
+               uint32_t color, struct window *w, bool flush) {
+    
+    static struct gl_glyph glyphs[MAX_GLYPHS_PER_DRAW];
+    static int glyph_count = 0;
 
-    GLuint vbo, vao;
+    GLuint vao;
     glGenVertexArrays(1, &vao);
-    glGenBuffers(1, &vbo);
+    glBindVertexArray(vao);
 
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, active_font->texture);
+    glBindTexture(GL_TEXTURE_2D, font->texture);
 
     glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_BUFFER, active_font->vertex_texture);
+    glBindTexture(GL_TEXTURE_BUFFER, font->vertex_texture);
 
-
-    glBindVertexArray(vao);
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
-
-    struct {float x; float y; uint32_t c; int32_t k;} glyphs[] = {
-        {0.0f,  20.f, 0xffffffff, 'a'},
-        {12.0f, 20.f, 0xff0000ff, 'b'},
-        {24.0f, 20.f, 0x0000ffff, 'c'},
-    };
-
-    glBufferData(GL_ARRAY_BUFFER, sizeof(glyphs), &glyphs, GL_STATIC_DRAW);
+    glBindBuffer(GL_ARRAY_BUFFER, w->text_area_glyphs);
 
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 16, 0);
@@ -396,65 +377,41 @@ void draw_text2(struct window *w, char *texts[], int nrows, int x, int y, double
     glUseProgram(w->frame->text_shader);
     glUniformMatrix4fv(w->frame->projection_uniform, 1, GL_FALSE, (GLfloat *) w->projection);
     glUniformMatrix4fv(w->frame->font_projection_uniform, 1, GL_FALSE,
-                       (GLfloat *) active_font->texture_projection);
+                       (GLfloat *) font->texture_projection);
     glUniform2f(w->frame->offset_uniform, w->position[1] + w->linum_width, w->position[0]);
     glUniform1i(w->frame->font_texture_uniform, 0);
     glUniform1i(w->frame->font_vertex_uniform, 1);
 
-    glDrawArrays(GL_POINTS, 0, 3);
-    glBindVertexArray(0);
-}
-
-void draw_text(char *texts[], int nrows, int x, int y, double scale) {
-    static GLfloat text_data[2048 * 6 * 4] = {0};
-    /* static int done = false; */
-
-    int total = 0;
-    int counter = 0;
-    y += line_spacing / scale;
-    int orig_x = x;
-    unsigned int bufsize = 0;
-    /* if (done) { */
-    /*     goto out; */
-    /* } */
-    for (size_t j = 0; j < nrows; ++j) {
-        const char *text = texts[j];
-        size_t n = strlen(text);
-        total += n;
-
-        struct glyph *_g = NULL;
-
-        for (size_t i = 0; i < n; ++i) {
-            struct glyph g = glyph_map[text[i]];
-            _g = &g;
-            GLfloat _w = (g.width * FONT_BUFFER_SIZE) / scale;
-            GLfloat _h = (g.height * FONT_BUFFER_SIZE) / scale;
-            GLfloat _x = (x + g.bearing_x / scale);
-            GLfloat _y = (y - g.bearing_y / scale);
-            GLfloat c[6][4] = {
-                {_x, _y,           g.offset_x, g.offset_y},
-                {_x + _w, _y,      g.offset_x + g.width, g.offset_y},
-                {_x, _y + _h,      g.offset_x, g.offset_y + g.height},
-
-                {_x, _y + _h,      g.offset_x, g.offset_y + g.height},
-                {_x + _w, _y,      g.offset_x + g.width, g.offset_y},
-                {_x + _w, _y + _h, g.offset_x + g.width, g.offset_y + g.height},
-            };
-            memcpy(&text_data[counter * 6 * 4], &c, 6 * 4 * sizeof(GLfloat));
-            counter++;
-
-            bufsize += sizeof(c);
-
-            x += g.advance / scale;
+    int base_x = x;
+    for (size_t i = 0; i < strlen(text); ++i) {
+        if (text[i] == '\n') {
+            x = base_x;
+            y += font->vertical_advance;
+            continue;
         }
-        y += line_spacing / scale;
-        x = orig_x;
+        if (text[i] == '\r') {
+            x = base_x;
+        }
+        if (glyph_count == MAX_GLYPHS_PER_DRAW) {
+            glBufferSubData(GL_ARRAY_BUFFER, 0, glyph_count * sizeof(struct gl_glyph), glyphs);
+            glDrawArrays(GL_POINTS, 0, glyph_count);
+            glyph_count = 0;
+        }
+
+        glyphs[glyph_count++] = (struct gl_glyph){x, y, color, text[i]};
+        x += font->horizontal_advances[text[i]];
     }
- /*    done = true; */
- /* out: */
-    glBufferData(GL_ARRAY_BUFFER, 24 * counter * sizeof(GLfloat), text_data, GL_DYNAMIC_DRAW);
-    glDrawArrays(GL_TRIANGLES, 0, 6 * counter);
+
+    if (flush) {
+        glBufferSubData(GL_ARRAY_BUFFER, 0, glyph_count * sizeof(struct gl_glyph), glyphs);
+        glDrawArrays(GL_POINTS, 0, glyph_count);
+        glyph_count = 0;
+    }
+
+    glBindVertexArray(0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
+
 
 void draw_rect(int x, int y, int w, int h, char *color_, struct window *win) {
     vec3 color;
@@ -466,7 +423,7 @@ void draw_rect(int x, int y, int w, int h, char *color_, struct window *win) {
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
     glEnableVertexAttribArray(0);
 
-    GLfloat linum_column[6][2] = {
+    GLfloat rect[6][2] = {
         {x, y},
         {x + w, y},
         {x, y + h},
@@ -478,7 +435,7 @@ void draw_rect(int x, int y, int w, int h, char *color_, struct window *win) {
 
     glUniform3fv(win->frame->bg_accent_color_uniform, 1, (GLfloat *) color);
     glUniformMatrix4fv(win->frame->bg_projection_uniform, 1, GL_FALSE, (GLfloat *) win->projection);
-    glBufferData(GL_ARRAY_BUFFER, 12 * sizeof(GLfloat), (GLfloat *)linum_column, GL_DYNAMIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, 12 * sizeof(GLfloat), (GLfloat *)rect, GL_DYNAMIC_DRAW);
 
     glDrawArrays(GL_TRIANGLES, 0, 6);
     glDisableVertexAttribArray(0);
@@ -494,12 +451,12 @@ void draw_line(int x1, int y1, int x2, int y2, char *color_, struct window *win)
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
     glEnableVertexAttribArray(0);
 
-    GLfloat linum_column[2][2] = {{x1, y1}, {x2, y2}};
+    GLfloat line[2][2] = {{x1, y1}, {x2, y2}};
     glLineWidth(1.0 * win->frame->scale);
 
     glUniform3fv(win->frame->bg_accent_color_uniform, 1, (GLfloat *) color);
     glUniformMatrix4fv(win->frame->bg_projection_uniform, 1, GL_FALSE, (GLfloat *) win->projection);
-    glBufferData(GL_ARRAY_BUFFER, 4 * sizeof(GLfloat), (GLfloat *)linum_column, GL_DYNAMIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, 4 * sizeof(GLfloat), (GLfloat *)line, GL_DYNAMIC_DRAW);
 
     glDrawArrays(GL_LINES, 0, 2);
     glDisableVertexAttribArray(0);
@@ -622,8 +579,8 @@ void window_render(struct window *w) {
     /* glBindTexture(GL_TEXTURE_2D, font_texture); */
 
     /* glUniformMatrix4fv(w->frame->projection_uniform, 1, GL_FALSE, (GLfloat *) w->projection); */
-    /* if (w->position[1] > 0) w->position[1] = 0; */
-    /* if (w->position[0] > 0) w->position[0] = 0; */
+    if (w->position[1] > 0) w->position[1] = 0;
+    if (w->position[0] > 0) w->position[0] = 0;
 
     /* glUniform2f(w->frame->offset_uniform, w->position[1] + w->linum_width, w->position[0]); */
     /* vec3 text_color; */
@@ -644,7 +601,13 @@ void window_render(struct window *w) {
     /*     "main(3, 5)" */
     /* }; */
     /* int LINES = 5; */
-    draw_text2(w, NULL, 5, 0, 0, 2.0);
+    /* draw_text2(w, NULL, 5, 0, 0, 2.0); */
+    if (w->contents)
+        draw_text(0.0, active_font->vertical_advance, w->contents, active_font, 
+                  0xffffffff /* color */, w, true /* flush */);
+
+    /* draw_text(0.0, 2 * active_font->vertical_advance, "this is another test", active_font,  */
+    /*           0x00ffffff /\* color *\/, w, true /\* flush *\/); */
 
     /* draw_text(texts, LINES, 0, 0, w->frame->scale); */
 

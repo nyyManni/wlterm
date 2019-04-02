@@ -16,7 +16,9 @@ uniform mat4 projection;
 precision mediump samplerBuffer;
 uniform samplerBuffer font_vertices;
 
-float scale = 1.75;
+// uniform float font_scale;
+float font_scale = 1.75;
+
 
 void main() {
     text_color = gs_in[0].color;
@@ -30,34 +32,39 @@ void main() {
 
     // Top left triangle
     // TL
-    gl_Position = projection * (gl_in[0].gl_Position + (bearing / scale));
+    gl_Position = projection * (gl_in[0].gl_Position + (bearing / font_scale));
     text_pos = text_offset;
     EmitVertex();
 
     // TR
-    gl_Position = projection * (gl_in[0].gl_Position + (bearing + vec4(text_size.x , 0.0, 0.0, 0.0)) / scale);
+    gl_Position = projection * (gl_in[0].gl_Position + 
+                                (bearing + vec4(text_size.x , 0.0, 0.0, 0.0)) / font_scale);
     text_pos = text_offset + vec2(text_size.x, 0.0);
     EmitVertex();
 
     // BL
-    gl_Position = projection * (gl_in[0].gl_Position + (bearing + vec4(0.0, text_size.y , 0.0, 0.0)) / scale);
+    gl_Position = projection * (gl_in[0].gl_Position + 
+                                (bearing + vec4(0.0, text_size.y , 0.0, 0.0)) / font_scale);
     text_pos = text_offset + vec2(0.0, text_size.y);
     EmitVertex();
 
 
     // Bottom right triangle
     // TR
-    gl_Position = projection * (gl_in[0].gl_Position + (bearing + vec4(0.0, text_size.y , 0.0, 0.0)) / scale);
+    gl_Position = projection * (gl_in[0].gl_Position + 
+                                (bearing + vec4(0.0, text_size.y , 0.0, 0.0)) / font_scale);
     text_pos = text_offset + vec2(0.0, text_size.y);
     EmitVertex();
 
     // BL
-    gl_Position = projection * (gl_in[0].gl_Position + (bearing + vec4(text_size.x , 0.0, 0.0, 0.0)) / scale);
+    gl_Position = projection * (gl_in[0].gl_Position + 
+                                (bearing + vec4(text_size.x , 0.0, 0.0, 0.0)) / font_scale);
     text_pos = text_offset + vec2(text_size.x, 0.0);
     EmitVertex();
 
     // BR
-    gl_Position = projection * (gl_in[0].gl_Position + (bearing + vec4(text_size.x, text_size.y , 0.0, 0.0)) / scale);
+    gl_Position = projection * (gl_in[0].gl_Position + 
+                                (bearing + vec4(text_size.x, text_size.y , 0.0, 0.0)) / font_scale);
     text_pos = text_offset + text_size;
     EmitVertex();
 

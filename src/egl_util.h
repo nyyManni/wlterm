@@ -20,7 +20,7 @@ EGLSurface platform_create_egl_surface(EGLDisplay dpy, EGLConfig config,
 EGLBoolean platform_destroy_egl_surface(EGLDisplay display, EGLSurface surface);
 
 char *read_file(const char *filename);
-char *read_buffer_contents(const char *filename, uint32_t *);
+char **read_buffer_contents(const char *filename, uint32_t *);
 
 GLuint create_shader(const char *source, GLenum shader_type);
 

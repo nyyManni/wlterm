@@ -350,11 +350,12 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    uint32_t bufsize;
     
     struct frame *f = frame_create();
 
-    f->root_window->contents = read_file("src/wlterm.c");
+    /* f->root_window->contents = read_buffer_contents("src/wlterm.c", &f->root_window->nlines); */
+    f->root_window->contents = read_buffer_contents("/home/hnyman/projects/github/emacs/src/xdisp.c", &f->root_window->nlines);
+    /* f->root_window->contents = read_file("/home/hnyman/projects/github/emacs/src/xdisp.c"); */
 
     while (wl_display_dispatch(g_display) != -1 && open_frames) {}
     kill_egl();

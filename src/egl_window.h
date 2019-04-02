@@ -98,7 +98,8 @@ struct window {
     double velocity[2];
     
     
-    char *contents;
+    char **contents;
+    uint32_t nlines;
 };
 
 struct glyph {

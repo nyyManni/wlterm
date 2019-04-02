@@ -347,7 +347,7 @@ struct frame *frame_create() {
     frame_render(f);
     return f;
 }
-void draw_text(int x, int y, char *text, struct font *font, 
+void draw_text(int x, int y, char *text, size_t len, struct font *font, 
                uint32_t color, struct window *w, bool flush) {
     
     static struct gl_glyph glyphs[MAX_GLYPHS_PER_DRAW];
@@ -376,14 +376,13 @@ void draw_text(int x, int y, char *text, struct font *font,
 
     glUseProgram(w->frame->text_shader);
     glUniformMatrix4fv(w->frame->projection_uniform, 1, GL_FALSE, (GLfloat *) w->projection);
-    glUniformMatrix4fv(w->frame->font_projection_uniform, 1, GL_FALSE,
-                       (GLfloat *) font->texture_projection);
+    glUniformMatrix4fv(w->frame->font_projection_uniform, 1, GL_FALSE, (GLfloat *) font->texture_projection);
     glUniform2f(w->frame->offset_uniform, w->position[1] + w->linum_width, w->position[0]);
     glUniform1i(w->frame->font_texture_uniform, 0);
     glUniform1i(w->frame->font_vertex_uniform, 1);
 
     int base_x = x;
-    for (size_t i = 0; i < strlen(text); ++i) {
+    for (size_t i = 0; i < len; ++i) {
         if (text[i] == '\n') {
             x = base_x;
             y += font->vertical_advance;
@@ -463,13 +462,31 @@ void draw_line(int x1, int y1, int x2, int y2, char *color_, struct window *win)
 }
 
 void draw_line_numbers(struct window *w, int n) {
-    /* int ncols = ceil(log10(n + 1)); */
+    int ncols = ceil(log10(n + 1));
+    int col_width = active_font->horizontal_advances['8'];
 
-    /* w->linum_width = 9 * (ncols + 2);  /\* Empty column on both sides. *\/ */
+    w->linum_width = col_width * (ncols + 2);  /* Empty column on both sides. */
 
-    /* /\* Line number column *\/ */
-    /* draw_rect(0, 0, w->linum_width, w->height, "11151c", w); */
+    /* Line number column */
+    draw_rect(0, 0, w->linum_width, w->height, "11151c", w);
+    
+    char fmt[10] = {0};
+    sprintf(fmt, "%%%dd", ncols);
+    char buf[36];
 
+    for (int i = 0; i < w->nlines; ++i) {
+        int vscroll_lines = i * active_font->vertical_advance;
+        if (vscroll_lines < -w->position[0] - active_font->vertical_advance) continue;
+        if (vscroll_lines > -w->position[0] + (w->height + active_font->vertical_advance)) break;
+        /* memset(buf, 0, 36); */
+        int _n = sprintf(buf, fmt, i + 1);
+        /* int _n = sprintf(buf, "%5d", i + 1); */
+        draw_text(-w->linum_width - w->position[1], active_font->vertical_advance * (i + 1), buf, _n,
+                  active_font, 0xffffffff /* color */, w, false /* flush */);
+    }
+    draw_text(0, 0, "", 0,
+              active_font, 0xffffffff /* color */, w, true /* flush */);
+    /* for  */
     /* glActiveTexture(GL_TEXTURE0); */
     /* glBindTexture(GL_TEXTURE_2D, font_texture); */
 
@@ -546,6 +563,9 @@ static inline void set_region(struct frame *f, int x, int y, int w, int h) {
 
 void window_render(struct window *w) {
 
+    if (w->position[1] > 0) w->position[1] = 0;
+    if (w->position[0] > 0) w->position[0] = 0;
+
     /* Prevent changing anything outside the window. */
     glEnable(GL_SCISSOR_TEST);
 
@@ -561,7 +581,7 @@ void window_render(struct window *w) {
     glClearColor(_color[0], _color[1], _color[2], 1.0);
     glClear(GL_COLOR_BUFFER_BIT);
 
-    draw_line_numbers(w, 5);
+    draw_line_numbers(w, w->nlines);
 
     /* Modeline */
     draw_rect(0, w->height - 20, w->width, 20, "0a3749", w);
@@ -570,62 +590,20 @@ void window_render(struct window *w) {
                w->width - w->linum_width, w->height - 20);
 
     /* Fill column indicator*/
-    draw_line(200, 0, 200, w->height, "0a3749", w);
+    draw_line(400 + w->position[1], 0, 400 + w->position[1], w->height, "0a3749", w);
 
-    /* glActiveTexture(GL_TEXTURE0); */
+    if (w->contents) {
+        for (int i = 0; i < w->nlines; ++i) {
+            int vscroll_lines = i * active_font->vertical_advance;
+            if (vscroll_lines < -w->position[0] - active_font->vertical_advance) continue;
+            if (vscroll_lines > -w->position[0] + (w->height + active_font->vertical_advance)) break;
+            draw_text(0.0, active_font->vertical_advance * (i + 1), w->contents[i], strlen(w->contents[i]),
+                  active_font, 0xffffffff /* color */, w, false /* flush */);
+        }
+        draw_text(0.0, 0.0, "", 0,
+                  active_font, 0xffffffff /* color */, w, true /* flush */);
 
-    /* glUseProgram(w->frame->text_shader); */
-
-    /* glBindTexture(GL_TEXTURE_2D, font_texture); */
-
-    /* glUniformMatrix4fv(w->frame->projection_uniform, 1, GL_FALSE, (GLfloat *) w->projection); */
-    if (w->position[1] > 0) w->position[1] = 0;
-    if (w->position[0] > 0) w->position[0] = 0;
-
-    /* glUniform2f(w->frame->offset_uniform, w->position[1] + w->linum_width, w->position[0]); */
-    /* vec3 text_color; */
-    /* parse_color("d26937", text_color); */
-    /* glUniform3fv(w->frame->color_uniform, 1, text_color); */
-
-    /* GLuint vbo; */
-    /* glGenBuffers(1, &vbo); */
-    /* glEnableVertexAttribArray(0); */
-    /* glBindBuffer(GL_ARRAY_BUFFER, vbo); */
-    /* glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 0, 0); */
-
-    /* char *texts[] = { */
-    /*     "def add(a: int, b: int) -> int:", */
-    /*     "    \"\"\" The main entry point. \"\"\"", */
-    /*     "    return a + b", */
-    /*     " ", */
-    /*     "main(3, 5)" */
-    /* }; */
-    /* int LINES = 5; */
-    /* draw_text2(w, NULL, 5, 0, 0, 2.0); */
-    if (w->contents)
-        draw_text(0.0, active_font->vertical_advance, w->contents, active_font, 
-                  0xffffffff /* color */, w, true /* flush */);
-
-    /* draw_text(0.0, 2 * active_font->vertical_advance, "this is another test", active_font,  */
-    /*           0x00ffffff /\* color *\/, w, true /\* flush *\/); */
-
-    /* draw_text(texts, LINES, 0, 0, w->frame->scale); */
-
-    /* set_region(w->frame, w->x, w->y, w->width, w->height); */
-    /* parse_color("0a3749", text_color); */
-    /* glUniform3fv(w->frame->color_uniform, 1, text_color); */
-
-    /* char *texts2[] = { */
-    /*     "1", */
-    /*     "2", */
-    /*     "3", */
-    /*     "4", */
-    /*     "5" */
-    /* }; */
-
-    /* glUniform2f(w->frame->offset_uniform, 30, w->position[0]); */
-    /* draw_text(texts2, LINES, 0, 0, w->frame->scale); */
-
+    }
 
     glDisable(GL_SCISSOR_TEST);
 }
@@ -640,93 +618,6 @@ void frame_render(struct frame *f) {
 
 
     window_render(f->root_window);
-
-    /* fprintf(stderr, "%f\n", w->height * 1.0); */
-    /* vec3 _color; */
-    /* parse_color("0c1014", _color); */
-    /* glClearColor(_color[0], _color[1], _color[2], 1.0); */
-    /* glClear(GL_COLOR_BUFFER_BIT); */
-
-    /* glUseProgram(f->bg_shader); */
-    /* glEnableVertexAttribArray(0); */
-
-    /* GLuint vbo2; */
-    /* glGenBuffers(1, &vbo2); */
-    /* glBindBuffer(GL_ARRAY_BUFFER, vbo2); */
-    /* glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0); */
-
-    /* GLfloat linum_column[6][2] = { */
-    /*     {0, 0}, */
-    /*     {100, 0}, */
-    /*     {0, f->height}, */
-
-    /*     {0, f->height}, */
-    /*     {100, 0}, */
-    /*     {100, f->height}, */
-
-    /* }; */
-    /* /\* GLfloat bg_color[3] = {1.0, 0.3, 0.3}; *\/ */
-    /* vec3 bg_accent_color; */
-    /* parse_color("11151c", bg_accent_color); */
-    /* glUniform3fv(f->bg_accent_color_uniform, 1, (GLfloat *) bg_accent_color); */
-    /* glUniformMatrix4fv(f->bg_projection_uniform, 1, GL_FALSE, (GLfloat *) projection); */
-    /* glBufferData(GL_ARRAY_BUFFER, 12 * sizeof(GLfloat), (GLfloat *)linum_column, GL_DYNAMIC_DRAW); */
-
-    /* glDrawArrays(GL_TRIANGLES, 0, 6); */
-
-    /* glDisableVertexAttribArray(0); */
-
-
-
-    /* glActiveTexture(GL_TEXTURE0); */
-
-    /* glUseProgram(f->text_shader); */
-
-    /* glBindTexture(GL_TEXTURE_2D, font_texture); */
-
-    /* glUniformMatrix4fv(f->projection_uniform, 1, GL_FALSE, (GLfloat *) projection); */
-    /* /\* uint32_t t = timestamp(); *\/ */
-    /* /\* glUniform2f(w->offset_uniform, 100 + sin(t / 200.0) * 100.0, 100 + cos(t / 200.0) * 100.0); *\/ */
-    /* if (f->position[1] < 100) f->position[1] = 100; */
-    /* if (f->position[0] < 0) f->position[0] = 0; */
-    /* glUniform2f(f->offset_uniform, f->position[1], f->position[0]); */
-    /* GLfloat color[3] = {1.0, 0.3, 0.3}; */
-    /* glUniform3fv(f->color_uniform, 1, (GLfloat *) color); */
-
-    /* GLuint vbo; */
-    /* glGenBuffers(1, &vbo); */
-    /* glEnableVertexAttribArray(0); */
-    /* glBindBuffer(GL_ARRAY_BUFFER, vbo); */
-    /* glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 0, 0); */
-
-    /* char *texts[] = { */
-    /*     "def add(a: int, b: int) -> int:", */
-    /*     "    \"\"\" The main entry point. \"\"\"", */
-    /*     "    return a + b", */
-    /*     " ", */
-    /*     "main(3, 5)" */
-    /* }; */
-    /* int LINES = 5; */
-
-    /* /\* #define LINES 1 *\/ */
-    /* /\* char *texts[LINES] = {0}; *\/ */
-    /* /\* for (int i = 0; i < LINES; ++i) { *\/ */
-    /* /\*     texts[i] = "The quick brown fox jumps over the lazy dog."; *\/ */
-    /* /\* } *\/ */
-
-    /* render_text(texts, LINES, 0, 0, f->scale);//line_spacing); */
-
-    /* /\* char *texts2[] = { *\/ */
-    /* /\*     "1", *\/ */
-    /* /\*     "2", *\/ */
-    /* /\*     "3", *\/ */
-    /* /\*     "4", *\/ */
-    /* /\*     "5" *\/ */
-    /* /\* }; *\/ */
-
-    /* /\* glUniform2f(w->offset_uniform, w->position[1], 0); *\/ */
-    /* /\* render_text(texts2, LINES, 0, line_spacing); *\/ */
-
 
     glBindTexture(GL_TEXTURE_2D, 0);
     glDisableVertexAttribArray(0);

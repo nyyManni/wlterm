@@ -101,6 +101,7 @@ struct window {
     /* double inertia[2]; /\* Pixels per second *\/ */
     /* uint32_t axis_time[2]; */
     /* double velocity[2]; */
+    bool _scrolling_freely;
     
     double _scroll_pos_buffer[2][SCROLL_WINDOW_SIZE];
     uint32_t _scroll_time_buffer[2][SCROLL_WINDOW_SIZE];

@@ -57,7 +57,7 @@ static void pointer_handle_button(void *data, struct wl_pointer *wl_pointer,
 
 static void pointer_handle_axis(void *data, struct wl_pointer *wl_pointer, uint32_t time,
                                 uint32_t axis, wl_fixed_t value) {
-    
+
 
     struct window *w = active_frame->root_window;
     w->_kinetic_scroll[axis] = 0.0;
@@ -74,6 +74,13 @@ static void pointer_handle_axis(void *data, struct wl_pointer *wl_pointer, uint3
 static void pointer_handle_frame(void *data, struct wl_pointer *wl_pointer) {
     struct window *w = active_frame->root_window;
 
+    if (w->_scrolling_freely) {
+        for (uint32_t axis = 0; axis < 2; ++axis) {
+          w->_kinetic_scroll[axis] = 0.0;
+        }
+        w->_scrolling_freely = false;
+    }
+
 
 
     for (uint32_t axis = 0; axis < 2; ++axis) {
@@ -89,12 +96,12 @@ static void pointer_handle_axis_source(void *data, struct wl_pointer *wl_pointer
 static void pointer_handle_axis_stop(void *data, struct wl_pointer *wl_pointer,
                                      uint32_t time, uint32_t axis) {
     struct window *w = active_frame->root_window;
-    
+
     double *window = w->_scroll_pos_buffer[axis];
     double *y_window = w->_scroll_pos_buffer[axis];
     uint32_t *t_window = w->_scroll_time_buffer[axis];
     double sign = (double)glm_sign(window[SCROLL_WINDOW_SIZE - 1]);
-    
+
     double velocities[SCROLL_WINDOW_SIZE - 1];
     uint32_t deltas[SCROLL_WINDOW_SIZE - 1];
     for (int i = 0; i < SCROLL_WINDOW_SIZE - 1; ++i) {
@@ -106,7 +113,7 @@ static void pointer_handle_axis_stop(void *data, struct wl_pointer *wl_pointer,
     for (int i = 0; i < SCROLL_WINDOW_SIZE - 1; ++i) {
         max_vel = sign * velocities[i] > sign * max_vel ? velocities[i] : max_vel;
     }
-    
+
 
     w->_kinetic_scroll[axis] = max_vel;
     w->_kinetic_scroll_t0[axis] = time;
@@ -278,7 +285,7 @@ static const struct wl_registry_listener registry_listener = {
 
 
 int main(int argc, char *argv[]) {
-    
+
     g_display = wl_display_connect(NULL);
     struct wl_registry *registry = wl_display_get_registry(g_display);
     wl_registry_add_listener(registry, &registry_listener, NULL);

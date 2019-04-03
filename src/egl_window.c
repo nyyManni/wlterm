@@ -72,12 +72,13 @@ static void frame_handle_done(void *data, struct wl_callback *callback, uint32_t
     struct frame *f = data;
     if (!f->open)
         return;
-    
-    wl_callback_destroy(callback);
-    bool scrolling_freely = false;
 
-    
+    wl_callback_destroy(callback);
+
     struct window *w = f->root_window;
+    /* w->_scrolling_freely = false; */
+
+
     /* Perform kinetic scrolling on the windows of the frame. */
     for (uint32_t axis = 0; axis < 2; ++axis) {
         if (fabs(w->_kinetic_scroll[axis]) > 0.00001) {
@@ -86,7 +87,7 @@ static void frame_handle_done(void *data, struct wl_callback *callback, uint32_t
             int sign = glm_sign(w->_kinetic_scroll[axis]);
 
             w->position[axis] += ((double)delta_t * w->_kinetic_scroll[axis]);
-            
+
             w->_kinetic_scroll[axis] *= pow(0.995, delta_t);
 
             w->_kinetic_scroll_t0[axis] = time;
@@ -97,8 +98,9 @@ static void frame_handle_done(void *data, struct wl_callback *callback, uint32_t
                     w->_scroll_time_buffer[axis][i] = 0;
                     w->_scroll_history_buffer[axis][i] = 0;
                 }
+                w->_scrolling_freely = false;
             } else {
-                scrolling_freely = true;
+                w->_scrolling_freely = true;
             }
         }
     }
@@ -107,7 +109,7 @@ static void frame_handle_done(void *data, struct wl_callback *callback, uint32_t
     fprintf(stdout, "%d,%f\n", time, -w->position[0]);
     callback = wl_surface_frame(f->surface);
     wl_callback_add_listener(callback, &frame_listener, f);
-    if (scrolling_freely) wl_surface_commit(f->surface);
+    if (w->_scrolling_freely) wl_surface_commit(f->surface);
 }
 
 const struct wl_callback_listener frame_listener = {
@@ -317,6 +319,7 @@ struct frame *frame_create() {
     f->root_window->position[1] = 0.0;
     f->root_window->_kinetic_scroll[0] = 0.0;
     f->root_window->_kinetic_scroll[1] = 0.0;
+    f->root_window->_scrolling_freely = false;
     f->root_window->linum_width = 0;
     f->root_window->contents = NULL;
     for (uint32_t axis = 0; axis < 2; ++axis) {
@@ -377,7 +380,7 @@ struct frame *frame_create() {
     f->offset_uniform = glGetUniformLocation(f->text_shader, "offset");
     glUniform1i(f->font_texture_uniform, 0);
     glUniform1i(f->font_vertex_uniform, 1);
-    
+
     f->overlay_projection_uniform = glGetUniformLocation(f->overlay_shader, "projection");
     f->overlay_offset_uniform = glGetUniformLocation(f->overlay_shader, "offset");
 
@@ -612,7 +615,7 @@ void window_render(struct window *w) {
     struct gl_overlay_vertex overlays[] = {
         {12 * col_width, 15 * active_font->vertical_advance, 0xc23127ff},
         {23 * col_width, 15 * active_font->vertical_advance, 0xc23127ff},
-        {3 * col_width, 30 * active_font->vertical_advance, 0xc23127ff}, 
+        {3 * col_width, 30 * active_font->vertical_advance, 0xc23127ff},
         {15 * col_width, 30 * active_font->vertical_advance, 0xc23127ff},
     };
     glBufferData(GL_ARRAY_BUFFER, sizeof(overlays), (GLfloat *)overlays, GL_DYNAMIC_DRAW);

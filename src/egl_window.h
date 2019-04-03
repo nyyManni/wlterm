@@ -102,9 +102,15 @@ struct window {
     /* uint32_t axis_time[2]; */
     /* double velocity[2]; */
     
-    int32_t _scroll_pos_buffer[2][SCROLL_WINDOW_SIZE];
+    double _scroll_pos_buffer[2][SCROLL_WINDOW_SIZE];
     uint32_t _scroll_time_buffer[2][SCROLL_WINDOW_SIZE];
     
+    double _kinetic_scroll[2];
+    uint32_t _kinetic_scroll_t0[2];
+
+    /* Used for linearization of the integral of the scroll speed. */
+    /* double _kinetic_scroll_compensation[2]; */
+
     
     char **contents;
     uint32_t nlines;

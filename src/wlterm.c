@@ -87,20 +87,28 @@ static void pointer_handle_button(void *data, struct wl_pointer *wl_pointer,
 static void pointer_handle_axis(void *data, struct wl_pointer *wl_pointer, uint32_t time,
                                 uint32_t axis, wl_fixed_t value) {
 
-    uint32_t other_axis = !axis;
+    /* fprintf(stderr, "handle_axis: %d\n", time); */
+    struct window *w = active_frame->root_window;
+    for (int i = 1; i < SCROLL_WINDOW_SIZE; ++i) {
+        w->_scroll_pos_buffer[axis][i - 1] = w->_scroll_pos_buffer[axis][i];
+        w->_scroll_time_buffer[axis][i - 1] = w->_scroll_time_buffer[axis][i];
+    }
+    w->_scroll_pos_buffer[axis][SCROLL_WINDOW_SIZE - 1] = value;
+    w->_scroll_time_buffer[axis][SCROLL_WINDOW_SIZE - 1] = time;
 
     /* static uint32_t a = 999; */
     /* if (a == axis) { */
     /*     scroll[0] = 0; */
     /*     scroll[1] = 0; */
     /* } */
+    fprintf(stderr, "handling axis: %d\n", axis);
 
-    active_frame->root_window->__position_pending[axis] = value;
+    /* active_frame->root_window->__position_pending[axis] = value; */
     /* fprintf(stderr, "scroll time: %d\n", time); */
 
-    active_frame->root_window->velocity[axis] = (double)active_frame->root_window->__position_pending[axis] /
-                                    (time - active_frame->root_window->axis_time[axis]);
-    active_frame->root_window->axis_time[axis] = time;
+    /* active_frame->root_window->velocity[axis] = (double)active_frame->root_window->__position_pending[axis] / */
+    /*                                 (time - active_frame->root_window->axis_time[axis]); */
+    /* active_frame->root_window->axis_time[axis] = time; */
     /* fprintf(stderr, "scroll scroll scroll\n"); */
     /* fprintf(stderr, "x: %f, y: %f\n", active_window->position[0], active_window->position[1]); */
 
@@ -108,21 +116,43 @@ static void pointer_handle_axis(void *data, struct wl_pointer *wl_pointer, uint3
 }
 
 static void pointer_handle_frame(void *data, struct wl_pointer *wl_pointer) {
+    struct window *w = active_frame->root_window;
 
-    if (!active_frame->root_window->__position_pending[0] && !active_frame->root_window->__position_pending[1])
-        return;
+    /* if (!active_frame->root_window->__position_pending[0] && !active_frame->root_window->__position_pending[1]) */
+    /*     return; */
+    /* if (!w->_scroll_time_buffer[0][SCROLL_WINDOW_SIZE - 1] && */
+    /*     !w->_scroll_time_buffer[1][SCROLL_WINDOW_SIZE - 1]) return; */
+    
+
+    /* fprintf(stderr, "%i,%i\n", */
+    /*         w->_scroll_time_buffer[0][SCROLL_WINDOW_SIZE - 1], */
+    /*         w->_scroll_pos_buffer[0][SCROLL_WINDOW_SIZE - 1]); */
+
+
+    /* fprintf(stdout, "%i,%i\n", active_frame->root_window->axis_time[0],  */
+    /*         -1 * active_frame->root_window->__position_pending[0]); */
+
+    /* fprintf(stdout, "%i,%i\n", w->axis_time[0],  */
+    /*         w->__position_pending[0]); */
+    /* fwrite(buf, strlen(buf), 40, data_out); */
+
+
 
     for (uint32_t axis = 0; axis < 2; ++axis) {
+        if (!w->_scroll_time_buffer[axis][SCROLL_WINDOW_SIZE - 1]) continue;
+
 
         /* active_window->axis_time[axis] = 0; */
         /* if (active_window->__position_pending[axis]) { */
         /* } else { */
         /*     active_window->velocity[axis] = 0.0; */
         /* } */
+        double delta = w->_scroll_pos_buffer[axis][SCROLL_WINDOW_SIZE -1] / 250.0;
+        fprintf(stderr, "axis: %d, delta: %f\n", axis, delta);
+        w->position[axis] += delta;
 
-        double delta = active_frame->root_window->__position_pending[axis] / 250.0;
-        active_frame->root_window->position[axis] += delta;
-
+        /* double delta = active_frame->root_window->__position_pending[axis] / 250.0; */
+        /* active_frame->root_window->position[axis] += delta; */
         /* while (active_window->position[axis] < 0) */
         /*     active_window->position[axis] += 800; */
         /* while (active_window->position[axis] > 800) */
@@ -131,9 +161,15 @@ static void pointer_handle_frame(void *data, struct wl_pointer *wl_pointer) {
         /* a = axis; */
         /* scroll[axis] = value; */
 
-        active_frame->root_window->__position_pending[axis] = 0;
+        /* active_frame->root_window->__position_pending[axis] = 0; */
         /* active_window->__position_pending[1] = 0; */
+    /* } */
+    /* for (uint32_t axis = 0; axis < 2; axis++) { */
+        /* if (w->_scroll_stop[axis]) { */
+        /*     w->_scroll_stop[axis] = false; */
+        /* } */
     }
+    fprintf(stderr, "y: %f, x: %f\n", w->position[0], w->position[1]);
 
     /* fprintf(stderr, "scroll frame\n"); */
     /* wl_surface_commit(active_window->surface); */
@@ -145,28 +181,39 @@ static void pointer_handle_axis_source(void *data, struct wl_pointer *wl_pointer
 }
 static void pointer_handle_axis_stop(void *data, struct wl_pointer *wl_pointer,
                                      uint32_t time, uint32_t axis) {
+    struct window *w = active_frame->root_window;
+    
+    /* w->_scroll_stop[axis] = true; */
     /* active_frame->root_window->inertia = true; */
-    active_frame->root_window->inertia[axis] = 1.0;
+    /* active_frame->root_window->inertia[axis] = 1.0; */
     /* active_frame->root_window->inertia[0] = active_frame->root_window->inertia[0] = 0.0; */
 
-    uint32_t tdiff = time - active_frame->root_window->axis_time[axis];
+    /* uint32_t tdiff = time - active_frame->root_window->axis_time[axis]; */
     /* fprintf(stderr, "%d\n", active_frame->root_window->axis_time[axis]); */
     /* fprintf(stderr, "scroll velocity: %f\n", active_frame->root_window->velocity[axis]); */
     /* fprintf(stderr, "scroll velocity: %f\n", active_frame->root_window->velocity[1]); */
 
-    active_frame->root_window->inertia[axis] = active_frame->root_window->velocity[axis];
+    /* active_frame->root_window->inertia[axis] = active_frame->root_window->velocity[axis]; */
     /* active_frame->root_window->inertia[1] = active_frame->root_window->velocity[1]; */
-    active_frame->root_window->velocity[axis] = 0;
+    /* active_frame->root_window->velocity[axis] = 0; */
     /* active_frame->root_window->velocity[1] = 0; */
 
-    wl_surface_commit(active_frame->surface);
+    /* wl_surface_commit(active_frame->surface); */
     /* fprintf(stderr, "axis stop\n"); */
+    /* if (axis == 0) */
+    /*     fprintf(stdout, "%i,%i\n", time, 0); */
     /* active_frame->root_window->axis_time[0] = active_frame->root_window->axis_time[1] = 0; */
-    if (time - active_frame->root_window->axis_time[axis] > 30) {
-        active_frame->root_window->inertia[axis] = 0;
-    }
+    /* if (time - active_frame->root_window->axis_time[axis] > 30) { */
+    /*     active_frame->root_window->inertia[axis] = 0; */
+    /* } */
 
-    active_frame->root_window->axis_time[axis] = 0;
+    fprintf(stderr, "axis_stop: %d\n", axis);
+    /* active_frame->root_window->axis_time[axis] = 0; */
+
+    for (int i = 0; i < SCROLL_WINDOW_SIZE; ++i) {
+        w->_scroll_pos_buffer[axis][i] = 0;
+        w->_scroll_time_buffer[axis][i] = 0;
+    }
 }
 static void pointer_handle_axis_discrete(void *data, struct wl_pointer *wl_pointer,
                                          uint32_t axis, int32_t discrete) {
@@ -338,7 +385,7 @@ static const struct wl_registry_listener registry_listener = {
 
 
 int main(int argc, char *argv[]) {
-
+    
     g_display = wl_display_connect(NULL);
     struct wl_registry *registry = wl_display_get_registry(g_display);
     wl_registry_add_listener(registry, &registry_listener, NULL);

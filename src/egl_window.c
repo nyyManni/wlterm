@@ -282,10 +282,16 @@ struct frame *frame_create() {
     f->root_window->y = 0;
     f->root_window->position[0] = 0.0;
     f->root_window->position[1] = 0.0;
-    f->root_window->__position_pending[0] = 0;
-    f->root_window->__position_pending[1] = 0;
+    /* f->root_window->__position_pending[0] = 0; */
+    /* f->root_window->__position_pending[1] = 0; */
     f->root_window->linum_width = 0;
     f->root_window->contents = NULL;
+    for (uint32_t axis = 0; axis < 2; ++axis) {
+        for (int i = 0; i < SCROLL_WINDOW_SIZE; ++i) {
+            f->root_window->_scroll_pos_buffer[axis][i - 1] = 0;
+            f->root_window->_scroll_time_buffer[axis][i - 1] = 0;
+        }
+    }
 
     /* Share the context between frames */
     f->gl_ctx = eglCreateContext(g_gl_display, g_gl_conf, g_root_ctx, context_attribs);

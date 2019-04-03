@@ -13,6 +13,7 @@
 #define MAX_FRAMES 64
 #define SCALE 2
 #define MAX_GLYPHS_PER_DRAW 4096
+#define SCROLL_WINDOW_SIZE 5
 
 struct window;
 
@@ -96,10 +97,13 @@ struct window {
 
     /* Scrolling stuff */
     double position[2];
-    int32_t __position_pending[2];
-    double inertia[2]; /* Pixels per second */
-    uint32_t axis_time[2];
-    double velocity[2];
+    /* int32_t __position_pending[2]; */
+    /* double inertia[2]; /\* Pixels per second *\/ */
+    /* uint32_t axis_time[2]; */
+    /* double velocity[2]; */
+    
+    int32_t _scroll_pos_buffer[2][SCROLL_WINDOW_SIZE];
+    uint32_t _scroll_time_buffer[2][SCROLL_WINDOW_SIZE];
     
     
     char **contents;

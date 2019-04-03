@@ -74,34 +74,40 @@ static void frame_handle_done(void *data, struct wl_callback *callback, uint32_t
         return;
     
     wl_callback_destroy(callback);
-    /* fprintf(stderr, "drawing a frame\n"); */
-    frame_render(f);
+    bool scrolling_freely = false;
 
-    callback = wl_surface_frame(f->surface);
-    wl_callback_add_listener(callback, &frame_listener, f);
     
     struct window *w = f->root_window;
     /* Perform kinetic scrolling on the windows of the frame. */
     for (uint32_t axis = 0; axis < 2; ++axis) {
-        /* if (axis) continue; /\*disable for horzontal *\/ */
         if (fabs(w->_kinetic_scroll[axis]) > 0.00001) {
             uint32_t delta_t = time - w->_kinetic_scroll_t0[axis];
 
-            /* fprintf(stderr, "E: delta_t: %u, vel: %f\n", delta_t, w->_kinetic_scroll[axis]); */
             int sign = glm_sign(w->_kinetic_scroll[axis]);
 
-            /* fprintf(stderr, "generating frame: %d\n", time); */
             w->position[axis] += ((double)delta_t * w->_kinetic_scroll[axis]);
             
-            /* w->_kinetic_scroll[axis] -= ((double)sign * (double)delta_t * 0.003); */
-            /* w->_kinetic_scroll[axis] = sign * glm_max((double)sign * w->_kinetic_scroll[axis], 0.0); */
             w->_kinetic_scroll[axis] *= pow(0.995, delta_t);
 
             w->_kinetic_scroll_t0[axis] = time;
+            if (fabs(w->_kinetic_scroll[axis]) < 0.01) {
+                w->_kinetic_scroll[axis] = 0.0;
+                for (int i = 0; i < SCROLL_WINDOW_SIZE; ++i) {
+                    w->_scroll_pos_buffer[axis][i] = 0;
+                    w->_scroll_time_buffer[axis][i] = 0;
+                    w->_scroll_history_buffer[axis][i] = 0;
+                }
+            } else {
+                scrolling_freely = true;
+            }
         }
-        wl_surface_commit(f->surface);
     }
 
+    frame_render(f);
+    fprintf(stdout, "%d,%f\n", time, -w->position[0]);
+    callback = wl_surface_frame(f->surface);
+    wl_callback_add_listener(callback, &frame_listener, f);
+    if (scrolling_freely) wl_surface_commit(f->surface);
 }
 
 const struct wl_callback_listener frame_listener = {
@@ -172,6 +178,7 @@ void init_egl() {
 
     g_root_ctx = eglCreateContext(g_gl_display, g_gl_conf, EGL_NO_CONTEXT, context_attribs);
     eglMakeCurrent(g_gl_display, EGL_NO_SURFACE, EGL_NO_SURFACE, g_root_ctx);
+    eglSwapInterval(g_gl_display, 0);
 }
 
 void kill_egl() {
@@ -199,6 +206,7 @@ struct font *load_font(const char *font_name, int height) {
     f->vertical_advance = face->size->metrics.height >> (6 + 1);
 
     eglMakeCurrent(g_gl_display, EGL_NO_SURFACE, EGL_NO_SURFACE, g_root_ctx);
+    eglSwapInterval(g_gl_display, 0);
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
     glEnable(GL_CULL_FACE);
@@ -279,6 +287,7 @@ void frame_resize(struct frame *f, int width, int height) {
 
     f->root_window->width = width;
     f->root_window->height = height - f->minibuffer_height;
+    wl_surface_commit(f->surface);
 }
 
 
@@ -308,14 +317,13 @@ struct frame *frame_create() {
     f->root_window->position[1] = 0.0;
     f->root_window->_kinetic_scroll[0] = 0.0;
     f->root_window->_kinetic_scroll[1] = 0.0;
-    /* f->root_window->__position_pending[0] = 0; */
-    /* f->root_window->__position_pending[1] = 0; */
     f->root_window->linum_width = 0;
     f->root_window->contents = NULL;
     for (uint32_t axis = 0; axis < 2; ++axis) {
         for (int i = 0; i < SCROLL_WINDOW_SIZE; ++i) {
-            f->root_window->_scroll_pos_buffer[axis][i - 1] = 0;
-            f->root_window->_scroll_time_buffer[axis][i - 1] = 0;
+            f->root_window->_scroll_pos_buffer[axis][i] = 0;
+            f->root_window->_scroll_time_buffer[axis][i] = 0;
+            f->root_window->_scroll_history_buffer[axis][i] = 0;
         }
     }
 
@@ -378,9 +386,6 @@ struct frame *frame_create() {
     f->bg_accent_color_uniform = glGetUniformLocation(f->bg_shader, "accentColor");
 
     wl_display_roundtrip(g_display);
-    wl_surface_commit(f->surface);
-
-    wl_surface_commit(f->surface);
 
     eglSwapBuffers(g_gl_display, f->gl_surface);
     struct wl_callback *callback = wl_surface_frame(f->surface);
@@ -621,6 +626,7 @@ void window_render(struct window *w) {
 void frame_render(struct frame *f) {
 
     eglMakeCurrent(g_gl_display, f->gl_surface, f->gl_surface, f->gl_ctx);
+    eglSwapInterval(g_gl_display, 0);
 
     glViewport(0, 0, f->width * f->scale, f->height * f->scale);
     glEnable(GL_BLEND);
@@ -638,7 +644,6 @@ void frame_render(struct frame *f) {
     glDisableVertexAttribArray(0);
 
     eglSwapBuffers(g_gl_display, f->gl_surface);
-    wl_surface_commit(f->surface);
 }
 
 void frame_close(struct frame *f) {

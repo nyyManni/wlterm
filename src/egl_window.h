@@ -13,7 +13,7 @@
 #define MAX_FRAMES 64
 #define SCALE 2
 #define MAX_GLYPHS_PER_DRAW 4096
-#define SCROLL_WINDOW_SIZE 5
+#define SCROLL_WINDOW_SIZE 8
 
 struct window;
 
@@ -104,6 +104,7 @@ struct window {
     
     double _scroll_pos_buffer[2][SCROLL_WINDOW_SIZE];
     uint32_t _scroll_time_buffer[2][SCROLL_WINDOW_SIZE];
+    double _scroll_history_buffer[2][SCROLL_WINDOW_SIZE];
     
     double _kinetic_scroll[2];
     uint32_t _kinetic_scroll_t0[2];

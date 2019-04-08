@@ -70,19 +70,26 @@ static const EGLint context_attribs[] = {EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE
 const struct wl_callback_listener frame_listener;
 static void frame_handle_done(void *data, struct wl_callback *callback, uint32_t time) {
     struct frame *f = data;
+
     if (!f->open)
         return;
 
     wl_callback_destroy(callback);
+    bool dirty = false;
 
     struct window *w = f->root_window;
-    /* w->_scrolling_freely = false; */
-
 
     /* Perform kinetic scrolling on the windows of the frame. */
     for (uint32_t axis = 0; axis < 2; ++axis) {
-        if (fabs(w->_kinetic_scroll[axis]) > 0.00001) {
+        if (w->_scrolling_freely) {
             uint32_t delta_t = time - w->_kinetic_scroll_t0[axis];
+            if (delta_t > 10000) {
+
+                /* For example resizing can lose the track of time. */
+                w->_kinetic_scroll_t0[axis] = time;
+                dirty = true;
+                break;
+            }
 
             int sign = glm_sign(w->_kinetic_scroll[axis]);
 
@@ -91,25 +98,27 @@ static void frame_handle_done(void *data, struct wl_callback *callback, uint32_t
             w->_kinetic_scroll[axis] *= pow(0.995, delta_t);
 
             w->_kinetic_scroll_t0[axis] = time;
-            if (fabs(w->_kinetic_scroll[axis]) < 0.01) {
+            if (w->position[axis] > 0) w->_scrolling_freely = false;
+
+            if (fabs(w->_kinetic_scroll[axis]) < 0.005) {
+                /* w->_scrolling_freely = false; */
                 w->_kinetic_scroll[axis] = 0.0;
                 for (int i = 0; i < SCROLL_WINDOW_SIZE; ++i) {
                     w->_scroll_pos_buffer[axis][i] = 0;
                     w->_scroll_time_buffer[axis][i] = 0;
                     w->_scroll_history_buffer[axis][i] = 0;
                 }
-                w->_scrolling_freely = false;
             } else {
-                w->_scrolling_freely = true;
+                dirty = true;
             }
+
         }
     }
 
     frame_render(f);
-    fprintf(stdout, "%d,%f\n", time, -w->position[0]);
     callback = wl_surface_frame(f->surface);
     wl_callback_add_listener(callback, &frame_listener, f);
-    if (w->_scrolling_freely) wl_surface_commit(f->surface);
+    if (dirty) wl_surface_commit(f->surface);
 }
 
 const struct wl_callback_listener frame_listener = {
@@ -289,6 +298,7 @@ void frame_resize(struct frame *f, int width, int height) {
 
     f->root_window->width = width;
     f->root_window->height = height - f->minibuffer_height;
+
     wl_surface_commit(f->surface);
 }
 

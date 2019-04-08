@@ -53,13 +53,16 @@ static void pointer_handle_motion(void *data, struct wl_pointer *pointer, uint32
 static void pointer_handle_button(void *data, struct wl_pointer *wl_pointer,
                                   uint32_t serial, uint32_t time, uint32_t button,
                                   uint32_t state) {
+    struct window *w = active_frame->root_window;
+
+    for (uint32_t axis = 0; axis < 2;++axis)
+        w->_scrolling_freely = false;
 }
 
 static void pointer_handle_axis(void *data, struct wl_pointer *wl_pointer, uint32_t time,
                                 uint32_t axis, wl_fixed_t value) {
-
-
     struct window *w = active_frame->root_window;
+    w->_scrolling_freely = false;
     w->_kinetic_scroll[axis] = 0.0;
     for (int i = 1; i < SCROLL_WINDOW_SIZE; ++i) {
         w->_scroll_pos_buffer[axis][i - 1] = w->_scroll_pos_buffer[axis][i];
@@ -69,24 +72,27 @@ static void pointer_handle_axis(void *data, struct wl_pointer *wl_pointer, uint3
     w->_scroll_pos_buffer[axis][SCROLL_WINDOW_SIZE - 1] = value / 250.0;
     w->_scroll_time_buffer[axis][SCROLL_WINDOW_SIZE - 1] = time;
     w->_scroll_history_buffer[axis][SCROLL_WINDOW_SIZE - 1] = w->position[axis];
+    if (!axis)
+        fprintf(stdout, "%u,%f,%f,\n", time, value / 250.0, w->position[axis]);
+    w->position[axis] += value / 250.0;
 }
 
 static void pointer_handle_frame(void *data, struct wl_pointer *wl_pointer) {
     struct window *w = active_frame->root_window;
 
-    if (w->_scrolling_freely) {
-        for (uint32_t axis = 0; axis < 2; ++axis) {
-          w->_kinetic_scroll[axis] = 0.0;
-        }
-        w->_scrolling_freely = false;
-    }
+    /* if (w->_scrolling_freely) { */
+    /*     for (uint32_t axis = 0; axis < 2; ++axis) { */
+    /*       w->_kinetic_scroll[axis] = 0.0; */
+    /*     } */
+    /*     w->_scrolling_freely = false; */
+    /* } */
 
 
 
-    for (uint32_t axis = 0; axis < 2; ++axis) {
-        double delta = w->_scroll_pos_buffer[axis][SCROLL_WINDOW_SIZE -1];
-        w->position[axis] += delta;
-    }
+    /* for (uint32_t axis = 0; axis < 2; ++axis) { */
+    /*     double delta = w->_scroll_pos_buffer[axis][SCROLL_WINDOW_SIZE -1]; */
+    /*     w->position[axis] += delta; */
+    /* } */
     wl_surface_commit(active_frame->surface);
 }
 
@@ -96,6 +102,7 @@ static void pointer_handle_axis_source(void *data, struct wl_pointer *wl_pointer
 static void pointer_handle_axis_stop(void *data, struct wl_pointer *wl_pointer,
                                      uint32_t time, uint32_t axis) {
     struct window *w = active_frame->root_window;
+    w->_scrolling_freely = true;
 
     double *window = w->_scroll_pos_buffer[axis];
     double *y_window = w->_scroll_pos_buffer[axis];

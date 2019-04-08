@@ -12,7 +12,7 @@
 
 #define MAX_FRAMES 64
 #define SCALE 2
-#define MAX_GLYPHS_PER_DRAW 4096
+#define MAX_GLYPHS_PER_DRAW 8192
 #define SCROLL_WINDOW_SIZE 8
 
 struct window;
@@ -29,7 +29,7 @@ struct frame {
     bool open;
     int width;
     int height;
-    
+
     double scale;
 
     /* OpenGL */
@@ -39,7 +39,7 @@ struct frame {
     EGLConfig gl_conf;
     EGLDisplay gl_display;
     EGLSurface gl_surface;
-    
+
     mat4 projection;
 
     GLuint shader_program;
@@ -47,9 +47,9 @@ struct frame {
     GLuint bg_shader;
     GLuint overlay_shader;
 
-    
+
     struct window *root_window;
-    
+
 
 
     GLuint projection_uniform;
@@ -57,29 +57,30 @@ struct frame {
     GLuint font_texture_uniform;
     GLuint font_vertex_uniform;
     GLuint font_scale_uniform;
-    
+
     GLuint overlay_projection_uniform;
     GLuint overlay_offset_uniform;
 
     GLuint bg_projection_uniform;
     GLuint bg_accent_color_uniform;
     GLuint offset_uniform;
-    
+
     bool has_minibuffer_p;
     int minibuffer_height;
+
 
 };
 
 struct window {
     struct frame *frame;
-    
+
     /* Window position in frame's coordinates */
     int x;
     int y;
-    
+
     int width;
     int height;
-    
+
     int linum_width;
 
     /* Window contents. */
@@ -90,7 +91,7 @@ struct window {
     GLuint right_margin_glyphs;
     GLuint text_area_glyphs;
     GLuint modeline_glyphs;
-    
+
     GLuint rect_vbo;
 
     mat4 projection;
@@ -102,18 +103,18 @@ struct window {
     /* uint32_t axis_time[2]; */
     /* double velocity[2]; */
     bool _scrolling_freely;
-    
+
     double _scroll_pos_buffer[2][SCROLL_WINDOW_SIZE];
     uint32_t _scroll_time_buffer[2][SCROLL_WINDOW_SIZE];
     double _scroll_history_buffer[2][SCROLL_WINDOW_SIZE];
-    
+
     double _kinetic_scroll[2];
     uint32_t _kinetic_scroll_t0[2];
 
     /* Used for linearization of the integral of the scroll speed. */
     /* double _kinetic_scroll_compensation[2]; */
 
-    
+
     char **contents;
     uint32_t nlines;
 };
@@ -137,11 +138,11 @@ struct font {
     GLuint vertex_texture;
     GLuint vertex_buffer;
     mat4 texture_projection;
-    
+
     int texture_size;
-    
+
     int vertical_advance;
-    
+
     int horizontal_advances[254];
 };
 

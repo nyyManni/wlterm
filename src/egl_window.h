@@ -95,21 +95,13 @@ struct window {
 
     /* Scrolling stuff */
     double position[2];
-    /* int32_t __position_pending[2]; */
-    /* double inertia[2]; /\* Pixels per second *\/ */
-    /* uint32_t axis_time[2]; */
-    /* double velocity[2]; */
-    bool _scrolling_freely;
+    bool _scrolling_freely[2];
 
-    double _scroll_pos_buffer[2][SCROLL_WINDOW_SIZE];
     uint32_t _scroll_time_buffer[2][SCROLL_WINDOW_SIZE];
-    double _scroll_history_buffer[2][SCROLL_WINDOW_SIZE];
+    double _scroll_position_buffer[2][SCROLL_WINDOW_SIZE];
 
     double _kinetic_scroll[2];
     uint32_t _kinetic_scroll_t0[2];
-
-    /* Used for linearization of the integral of the scroll speed. */
-    /* double _kinetic_scroll_compensation[2]; */
 
     char **contents;
     uint32_t nlines;

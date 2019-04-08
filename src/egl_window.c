@@ -81,7 +81,7 @@ static void frame_handle_done(void *data, struct wl_callback *callback, uint32_t
 
     /* Perform kinetic scrolling on the windows of the frame. */
     for (uint32_t axis = 0; axis < 2; ++axis) {
-        if (w->_scrolling_freely) {
+        if (w->_scrolling_freely[axis]) {
             uint32_t delta_t = time - w->_kinetic_scroll_t0[axis];
             if (delta_t > 10000) {
 
@@ -95,21 +95,14 @@ static void frame_handle_done(void *data, struct wl_callback *callback, uint32_t
 
             w->position[axis] += ((double)delta_t * w->_kinetic_scroll[axis]);
 
-            w->_kinetic_scroll[axis] *= pow(0.995, delta_t);
+            w->_kinetic_scroll[axis] *= pow(0.996, delta_t);
 
             w->_kinetic_scroll_t0[axis] = time;
-            if (w->position[axis] > 0) w->_scrolling_freely = false;
+            if (w->position[axis] > 0) w->_scrolling_freely[axis] = false;
 
             if (fabs(w->_kinetic_scroll[axis]) < 0.005) {
                 w->_kinetic_scroll[axis] = 0.0;
-                for (int i = 0; i < SCROLL_WINDOW_SIZE; ++i) {
-                    w->_scroll_pos_buffer[axis][i] = 0;
-                    w->_scroll_time_buffer[axis][i] = 0;
-                    w->_scroll_history_buffer[axis][i] = NAN;
-                }
             } else {
-
-                fprintf(stdout, "%u,,,%f\n", time, w->position[axis]);
                 dirty = true;
             }
 
@@ -330,14 +323,14 @@ struct frame *frame_create() {
     f->root_window->position[1] = 0.0;
     f->root_window->_kinetic_scroll[0] = 0.0;
     f->root_window->_kinetic_scroll[1] = 0.0;
-    f->root_window->_scrolling_freely = false;
+    for (uint32_t axis = 0; axis < 2;++axis)
+        f->root_window->_scrolling_freely[axis] = false;
     f->root_window->linum_width = 0;
     f->root_window->contents = NULL;
     for (uint32_t axis = 0; axis < 2; ++axis) {
         for (int i = 0; i < SCROLL_WINDOW_SIZE; ++i) {
-            f->root_window->_scroll_pos_buffer[axis][i] = 0;
             f->root_window->_scroll_time_buffer[axis][i] = 0;
-            f->root_window->_scroll_history_buffer[axis][i] = NAN;
+            f->root_window->_scroll_position_buffer[axis][i] = NAN;
         }
     }
 

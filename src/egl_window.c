@@ -407,14 +407,24 @@ void draw_text(int x, int y, char *text, size_t len, struct font *font,
 
 
     int base_x = x;
+    int col_width = active_font->horizontal_advances['8'];
+    int tab_width = 8;
     for (size_t i = 0; i < len; ++i) {
         if (text[i] == '\n') {
             x = base_x;
             y += font->vertical_advance;
             continue;
         }
+        if (text[i] == '\t') {
+            int tab_stop = 0;
+            int increment = 0;
+            while (tab_stop <= x) tab_stop += (tab_width * col_width);
+            x = tab_stop;
+            continue;
+        }
         if (text[i] == '\r') {
             x = base_x;
+            continue;
         }
         if (glyph_count == MAX_GLYPHS_PER_DRAW) {
             glBufferSubData(GL_ARRAY_BUFFER, 0, glyph_count * sizeof(struct gl_glyph), glyphs);

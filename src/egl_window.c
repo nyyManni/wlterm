@@ -101,14 +101,15 @@ static void frame_handle_done(void *data, struct wl_callback *callback, uint32_t
             if (w->position[axis] > 0) w->_scrolling_freely = false;
 
             if (fabs(w->_kinetic_scroll[axis]) < 0.005) {
-                /* w->_scrolling_freely = false; */
                 w->_kinetic_scroll[axis] = 0.0;
                 for (int i = 0; i < SCROLL_WINDOW_SIZE; ++i) {
                     w->_scroll_pos_buffer[axis][i] = 0;
                     w->_scroll_time_buffer[axis][i] = 0;
-                    w->_scroll_history_buffer[axis][i] = 0;
+                    w->_scroll_history_buffer[axis][i] = NAN;
                 }
             } else {
+
+                fprintf(stdout, "%u,,,%f\n", time, w->position[axis]);
                 dirty = true;
             }
 
@@ -336,7 +337,7 @@ struct frame *frame_create() {
         for (int i = 0; i < SCROLL_WINDOW_SIZE; ++i) {
             f->root_window->_scroll_pos_buffer[axis][i] = 0;
             f->root_window->_scroll_time_buffer[axis][i] = 0;
-            f->root_window->_scroll_history_buffer[axis][i] = 0;
+            f->root_window->_scroll_history_buffer[axis][i] = NAN;
         }
     }
 

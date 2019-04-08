@@ -13,7 +13,7 @@
 #define MAX_FRAMES 64
 #define SCALE 2
 #define MAX_GLYPHS_PER_DRAW 8192
-#define SCROLL_WINDOW_SIZE 8
+#define SCROLL_WINDOW_SIZE 5
 
 struct window;
 
@@ -47,10 +47,7 @@ struct frame {
     GLuint bg_shader;
     GLuint overlay_shader;
 
-
     struct window *root_window;
-
-
 
     GLuint projection_uniform;
     GLuint font_projection_uniform;
@@ -113,7 +110,6 @@ struct window {
 
     /* Used for linearization of the integral of the scroll speed. */
     /* double _kinetic_scroll_compensation[2]; */
-
 
     char **contents;
     uint32_t nlines;

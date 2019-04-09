@@ -70,6 +70,7 @@ static void pointer_handle_axis(void *data, struct wl_pointer *wl_pointer, uint3
         w->_scroll_position_buffer[axis][i - 1] = w->_scroll_position_buffer[axis][i];
     }
     w->position[axis] += value / 250.0;
+    if (w->position[axis] > 0) w->position[axis] = 0.0;
     w->_scroll_time_buffer[axis][SCROLL_WINDOW_SIZE - 1] = time;
     w->_scroll_position_buffer[axis][SCROLL_WINDOW_SIZE - 1] = w->position[axis];
 }
@@ -87,16 +88,16 @@ static void pointer_handle_axis_source(void *data, struct wl_pointer *wl_pointer
 static void pointer_handle_axis_stop(void *data, struct wl_pointer *wl_pointer,
                                      uint32_t time, uint32_t axis) {
     struct window *w = active_frame->root_window;
-    
+
     size_t window_len = SCROLL_WINDOW_SIZE;
     double *s_window = w->_scroll_position_buffer[axis];
     while (!(*s_window == *s_window)) {
         if (!--window_len) return;
         ++s_window;
     };
-    uint32_t *t_window = w->_scroll_time_buffer[axis]; 
+    uint32_t *t_window = w->_scroll_time_buffer[axis];
     t_window += (SCROLL_WINDOW_SIZE - window_len);
-    
+
     uint32_t dt_window[SCROLL_WINDOW_SIZE];
     double ds_window[SCROLL_WINDOW_SIZE];
     double v_window[SCROLL_WINDOW_SIZE];
@@ -116,14 +117,19 @@ static void pointer_handle_axis_stop(void *data, struct wl_pointer *wl_pointer,
             max_v = v_window[i];
         }
     }
-    w->_kinetic_scroll[axis] = max_v;
-    w->_kinetic_scroll_t0[axis] = time;
+    if (fabs(v_window[window_len - 2]) > 0.1) {
+        w->_kinetic_scroll[axis] = max_v;
+        w->_kinetic_scroll_t0[axis] = time;
 
-    uint32_t delta_t = time - t_window[max_index];
-    
-    /* Compensate for the lag between the axis frame and the stop-frame. */
-    w->position[axis] = s_window[max_index] + delta_t * max_v;
-    w->_scrolling_freely[axis] = true;
+        uint32_t delta_t = time - t_window[max_index];
+
+
+        /* Return from suspend might do strange things to delta_t */
+        if (delta_t < 10000) {
+            w->position[axis] = s_window[max_index] + delta_t * max_v;
+        }
+        w->_scrolling_freely[axis] = true;
+    }
 
     /* Clear window buffers */
     for (int i = 0; i < SCROLL_WINDOW_SIZE; ++i) {

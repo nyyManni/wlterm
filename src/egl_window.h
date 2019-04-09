@@ -16,9 +16,11 @@
 #define SCROLL_WINDOW_SIZE 5
 
 struct window;
+struct frame;
 
 struct frame {
 
+    struct frame *next;
     struct wl_surface *surface;
     struct xdg_surface *xdg_surface;
     struct xdg_toplevel *xdg_toplevel;
@@ -70,6 +72,7 @@ struct frame {
 
 struct window {
     struct frame *frame;
+    struct window *next;
 
     /* Window position in frame's coordinates */
     int x;
@@ -105,20 +108,6 @@ struct window {
 
     char **contents;
     uint32_t nlines;
-};
-
-struct glyph {
-    FT_ULong code;
-    GLuint texture;
-
-    GLfloat offset_x;
-    GLfloat offset_y;
-    GLfloat width;
-    GLfloat height;
-
-    int advance;
-    int bearing_x;
-    int bearing_y;
 };
 
 struct font {

@@ -50,7 +50,6 @@ int parse_color(const char *color, vec3 ret) {
     return 1;
 };
 
-/* struct glyph glyph_map[254]; */
 mat4 text_projection;
 
 extern struct wl_display *g_display;

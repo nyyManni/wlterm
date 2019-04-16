@@ -11,7 +11,7 @@
 
 #include <sys/time.h>
 
-#include <GLES2/gl2.h>
+#include <GLES3/gl32.h>
 
 #include <wayland-client-protocol.h>
 #include <wayland-client.h>
@@ -31,7 +31,7 @@ struct wl_pointer *g_pointer;
 struct xdg_wm_base *g_xdg_wm_base;
 struct wl_shm *g_shm;
 
-extern struct frame *active_frame;
+/* extern struct frame *selected_frame; */
 extern struct frame *frames[];
 extern int open_frames;
 
@@ -53,7 +53,7 @@ static void pointer_handle_motion(void *data, struct wl_pointer *pointer, uint32
 static void pointer_handle_button(void *data, struct wl_pointer *wl_pointer,
                                   uint32_t serial, uint32_t time, uint32_t button,
                                   uint32_t state) {
-    struct window *w = active_frame->root_window;
+    struct window *w = selected_frame->root_window;
 
     for (uint32_t axis = 0; axis < 2;++axis)
         w->_scrolling_freely[axis] = false;
@@ -61,7 +61,7 @@ static void pointer_handle_button(void *data, struct wl_pointer *wl_pointer,
 
 static void pointer_handle_axis(void *data, struct wl_pointer *wl_pointer, uint32_t time,
                                 uint32_t axis, wl_fixed_t value) {
-    struct window *w = active_frame->root_window;
+    struct window *w = selected_frame->root_window;
     for (uint32_t axis = 0; axis < 2;++axis)
         w->_scrolling_freely[axis] = false;
     w->_kinetic_scroll[axis] = 0.0;
@@ -76,9 +76,9 @@ static void pointer_handle_axis(void *data, struct wl_pointer *wl_pointer, uint3
 }
 
 static void pointer_handle_frame(void *data, struct wl_pointer *wl_pointer) {
-    struct window *w = active_frame->root_window;
+    struct window *w = selected_frame->root_window;
 
-    wl_surface_commit(active_frame->surface);
+    wl_surface_commit(selected_frame->surface);
 }
 
 static void pointer_handle_axis_source(void *data, struct wl_pointer *wl_pointer,
@@ -87,7 +87,7 @@ static void pointer_handle_axis_source(void *data, struct wl_pointer *wl_pointer
 
 static void pointer_handle_axis_stop(void *data, struct wl_pointer *wl_pointer,
                                      uint32_t time, uint32_t axis) {
-    struct window *w = active_frame->root_window;
+    struct window *w = selected_frame->root_window;
 
     size_t window_len = SCROLL_WINDOW_SIZE;
     double *s_window = w->_scroll_position_buffer[axis];
@@ -198,7 +198,7 @@ static void keyboard_keymap(void *data, struct wl_keyboard *wl_keyboard, uint32_
 static void keyboard_enter(void *data, struct wl_keyboard *wl_keyboard, uint32_t serial,
                            struct wl_surface *surface, struct wl_array *keys) {
 
-    active_frame = wl_surface_get_user_data(surface);
+    selected_frame = wl_surface_get_user_data(surface);
     // Who cares
 }
 
@@ -222,7 +222,7 @@ static void keyboard_key(void *data, struct wl_keyboard *wl_keyboard, uint32_t s
     if (key_state != WL_KEYBOARD_KEY_STATE_PRESSED)
         return;
     if (sym == XKB_KEY_c) {
-        frame_close(active_frame);
+        frame_close(selected_frame);
     } else if (sym == XKB_KEY_n) {
         frame_create();
     }
@@ -258,16 +258,6 @@ const struct wl_seat_listener seat_listener = {
     .name = seat_handle_name,
 };
 
-
-static void handle_xdg_buffer_configure(void *data, struct xdg_surface *xdg_surface,
-                                        uint32_t serial) {
-    struct frame *w = data;
-
-    xdg_surface_ack_configure(w->xdg_surface, serial);
-}
-
-static struct xdg_surface_listener xdg_surface_listener = {
-    .configure = handle_xdg_buffer_configure};
 
 static void handle_global(void *data, struct wl_registry *registry, uint32_t name,
                           const char *interface, uint32_t version) {

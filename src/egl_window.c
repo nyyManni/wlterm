@@ -14,6 +14,8 @@
 #include <wayland-client.h>
 #include <wayland-egl.h>
 
+#include "msdf.h"
+
 #include "egl_util.h"
 #include "egl_window.h"
 #include "xdg-shell-client-protocol.h"
@@ -31,8 +33,8 @@
 
 int line_spacing = 18 * 2.0;
 
-FT_Library ft = NULL;
-FT_Face face = NULL;
+/* FT_Library ft = NULL; */
+/* FT_Face face = NULL; */
 
 GLuint font_texture;
 struct font *active_font;
@@ -60,7 +62,7 @@ EGLContext g_root_ctx;
 extern struct wl_compositor *g_compositor;
 extern struct xdg_wm_base *g_xdg_wm_base;
 
-struct frame *active_frame;
+struct frame *selected_frame;
 struct frame *frames[MAX_FRAMES];
 int open_frames = 0;
 
@@ -70,41 +72,41 @@ const struct wl_callback_listener frame_listener;
 static void frame_handle_done(void *data, struct wl_callback *callback, uint32_t time) {
     struct frame *f = data;
 
+    wl_callback_destroy(callback);
+
     if (!f->open)
         return;
-
-    wl_callback_destroy(callback);
     bool dirty = false;
 
-    struct window *w = f->root_window;
+    FOR_EACH_WINDOW(f, w) {
+        /* Perform kinetic scrolling on the windows of the frame. */
+        for (uint32_t axis = 0; axis < 2; ++axis) {
+            if (w->_scrolling_freely[axis]) {
+                uint32_t delta_t = time - w->_kinetic_scroll_t0[axis];
+                if (delta_t > 10000) {
 
-    /* Perform kinetic scrolling on the windows of the frame. */
-    for (uint32_t axis = 0; axis < 2; ++axis) {
-        if (w->_scrolling_freely[axis]) {
-            uint32_t delta_t = time - w->_kinetic_scroll_t0[axis];
-            if (delta_t > 10000) {
+                    /* For example resizing can lose the track of time. */
+                    w->_kinetic_scroll_t0[axis] = time;
+                    dirty = true;
+                    break;
+                }
 
-                /* For example resizing can lose the track of time. */
+                int sign = glm_sign(w->_kinetic_scroll[axis]);
+
+                w->position[axis] += ((double)delta_t * w->_kinetic_scroll[axis]);
+
+                w->_kinetic_scroll[axis] *= pow(0.996, delta_t);
+
                 w->_kinetic_scroll_t0[axis] = time;
-                dirty = true;
-                break;
+                if (w->position[axis] > 0) w->_scrolling_freely[axis] = false;
+
+                if (fabs(w->_kinetic_scroll[axis]) < 0.005) {
+                    w->_kinetic_scroll[axis] = 0.0;
+                } else {
+                    dirty = true;
+                }
+
             }
-
-            int sign = glm_sign(w->_kinetic_scroll[axis]);
-
-            w->position[axis] += ((double)delta_t * w->_kinetic_scroll[axis]);
-
-            w->_kinetic_scroll[axis] *= pow(0.996, delta_t);
-
-            w->_kinetic_scroll_t0[axis] = time;
-            if (w->position[axis] > 0) w->_scrolling_freely[axis] = false;
-
-            if (fabs(w->_kinetic_scroll[axis]) < 0.005) {
-                w->_kinetic_scroll[axis] = 0.0;
-            } else {
-                dirty = true;
-            }
-
         }
     }
 
@@ -197,17 +199,19 @@ struct font *load_font(const char *font_name, int height) {
     active_font = f;
     f->texture_size = FONT_BUFFER_SIZE;
 
-    if (!ft && FT_Init_FreeType(&ft)) {
-        fprintf(stderr, "Could not init freetype library\n");
-        return NULL;
-    }
-    if (FT_New_Face(ft, font_name, 0, &face)) {
-        fprintf(stderr, "Could not init font\n");
-        return NULL;
-    }
-    FT_Set_Pixel_Sizes(face, 0, height * 2.0);
+    /* if (!ft && FT_Init_FreeType(&ft)) { */
+    /*     fprintf(stderr, "Could not init freetype library\n"); */
+    /*     return NULL; */
+    /* } */
+    /* if (FT_New_Face(ft, font_name, 0, &face)) { */
+    /*     fprintf(stderr, "Could not init font\n"); */
+    /*     return NULL; */
+    /* } */
+    /* FT_Set_Pixel_Sizes(face, 0, height * 2.0); */
+    msdf_font_handle msdf_font = msdf_load_font(font_name);
 
-    f->vertical_advance = face->size->metrics.height >> (6 + 1);
+    /* f->vertical_advance = face->size->metrics.height >> (6 + 1); */
+    f->vertical_advance = 32;
 
     eglMakeCurrent(g_gl_display, EGL_NO_SURFACE, EGL_NO_SURFACE, g_root_ctx);
     eglSwapInterval(g_gl_display, 0);
@@ -221,8 +225,10 @@ struct font *load_font(const char *font_name, int height) {
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, f->texture);
 
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, f->texture_size, f->texture_size,
-                 0, GL_RED, GL_UNSIGNED_BYTE, 0);
+    /* glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, f->texture_size, f->texture_size, */
+    /*              0, GL_RED, GL_UNSIGNED_BYTE, 0); */
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, f->texture_size, f->texture_size,
+                 0, GL_RGB, GL_FLOAT, 0);
 
     glm_ortho(-f->texture_size, f->texture_size,
               -f->texture_size, f->texture_size,
@@ -235,28 +241,37 @@ struct font *load_font(const char *font_name, int height) {
     int offset_x = 0, offset_y = 0, y_increment = 0;
 
     for (unsigned int i = 0; i < 254; ++i) {
-        FT_Load_Char(face, i, FT_LOAD_RENDER);
-        FT_GlyphSlot g = face->glyph;
+        /* FT_Load_Char(face, i, FT_LOAD_RENDER); */
+        /* FT_GlyphSlot _g = face->glyph; */
+        msdf_glyph_handle g = msdf_generate_glyph(msdf_font, i, 4.0, 1.0);
 
         if (offset_x + g->bitmap.width > FONT_BUFFER_SIZE) {
             offset_y += (y_increment + 1);
             offset_x = 0;
         }
 
+        /* if (i == 'a') { */
+        /*     fprintf(stderr, "OLD: bitmap: %ix%i, bearing: %i, %i\n", _g->bitmap.width, */
+        /*             _g->bitmap.rows, _g->bitmap_left, _g->bitmap_top); */
+        /*     fprintf(stderr, "NEW: bitmap: %ix%i, bearing: %.2f, %.2f\n", g->bitmap.width, */
+        /*             g->bitmap.height, g->bearing[0], g->bearing[1]); */
+        /* } */
+
         glActiveTexture(GL_TEXTURE0);
         glTexSubImage2D(GL_TEXTURE_2D, 0, offset_x, offset_y, g->bitmap.width,
-                        g->bitmap.rows, GL_RED, GL_UNSIGNED_BYTE, g->bitmap.buffer);
-        y_increment = y_increment > g->bitmap.rows ? y_increment : g->bitmap.rows;
+                        g->bitmap.height, GL_RGB, GL_FLOAT, g->bitmap.data);
+        y_increment = y_increment > g->bitmap.height ? y_increment : g->bitmap.height;
 
-        f->horizontal_advances[i] = g->advance.x >> (6 + 1);
+        /* f->horizontal_advances[i] = g->advance.x >> (6 + 1); */
+        f->horizontal_advances[i] = g->advance;
 
         float _buf[] = {
-            offset_x, offset_y, g->bitmap.width, g->bitmap.rows,
-            g->bitmap_left, -g->bitmap_top,
+            offset_x, offset_y, g->bitmap.width, g->bitmap.height,
+            g->bearing[0], -g->bearing[1],
+            g->size[0], g->size[1]
         };
-        glBufferSubData(GL_ARRAY_BUFFER, i * 6 * sizeof(GLuint), sizeof(_buf), _buf);
+        glBufferSubData(GL_ARRAY_BUFFER, i * 8 * sizeof(GLuint), sizeof(_buf), _buf);
         offset_x += g->bitmap.width + 1;
-
     }
     font_texture = f->texture;
 
@@ -276,8 +291,8 @@ struct font *load_font(const char *font_name, int height) {
     glBindTexture(GL_TEXTURE_BUFFER, 0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 
-    FT_Done_Face(face);
-    FT_Done_FreeType(ft);
+    /* FT_Done_Face(face); */
+    /* FT_Done_FreeType(ft); */
 
     return f;
 }
@@ -332,6 +347,7 @@ struct frame *frame_create() {
             f->root_window->_scroll_position_buffer[axis][i] = NAN;
         }
     }
+    f->root_window->next = NULL;
 
     /* Share the context between frames */
     f->gl_ctx = eglCreateContext(g_gl_display, g_gl_conf, g_root_ctx, context_attribs);
@@ -567,7 +583,8 @@ void window_render(struct window *w) {
     glUseProgram(w->frame->text_shader);
     glUniformMatrix4fv(w->frame->projection_uniform, 1, GL_FALSE, (GLfloat *) w->projection);
     glUniformMatrix4fv(w->frame->font_projection_uniform, 1, GL_FALSE, (GLfloat *) font->texture_projection);
-    glUniform1f(w->frame->font_scale_uniform, w->frame->scale);
+    /* glUniform1f(w->frame->font_scale_uniform, w->frame->scale); */
+    glUniform1f(w->frame->font_scale_uniform, 1.0);
     glUniform2f(w->frame->offset_uniform, w->position[1] + w->linum_width, w->position[0]);
     glUniform1i(w->frame->font_texture_uniform, 0);
     glUniform1i(w->frame->font_vertex_uniform, 1);
@@ -626,13 +643,13 @@ void window_render(struct window *w) {
     glVertexAttribIPointer(1, 4, GL_UNSIGNED_BYTE, 12, (void *)8);
     glLineWidth(2.0 * w->frame->scale);
     struct gl_overlay_vertex overlays[] = {
-        {12 * col_width, 15 * active_font->vertical_advance, 0xc23127ff},
-        {23 * col_width, 15 * active_font->vertical_advance, 0xc23127ff},
-        {3 * col_width, 30 * active_font->vertical_advance, 0xc23127ff},
-        {15 * col_width, 30 * active_font->vertical_advance, 0xc23127ff},
+        {8 * col_width, 2 * active_font->vertical_advance, 0xc23127ff},
+        {11 * col_width, 2 * active_font->vertical_advance, 0xc23127ff},
+        /* {3 * col_width, 30 * active_font->vertical_advance, 0xc23127ff}, */
+        /* {15 * col_width, 30 * active_font->vertical_advance, 0xc23127ff}, */
     };
     glBufferData(GL_ARRAY_BUFFER, sizeof(overlays), (GLfloat *)overlays, GL_DYNAMIC_DRAW);
-    glDrawArrays(GL_LINES, 0, 4);
+    glDrawArrays(GL_LINES, 0, 2);
 
     glBindVertexArray(0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -654,7 +671,9 @@ void frame_render(struct frame *f) {
     glClearColor(_color[0], _color[1], _color[2], 1.0);
     glClear(GL_COLOR_BUFFER_BIT);
 
-    window_render(f->root_window);
+    FOR_EACH_WINDOW (f, w) {
+        window_render(w);
+    }
 
     glBindTexture(GL_TEXTURE_2D, 0);
     glDisableVertexAttribArray(0);

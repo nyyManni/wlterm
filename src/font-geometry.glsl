@@ -1,11 +1,14 @@
 #version 320 es
 
 layout (points) in;
-layout (triangle_strip, max_vertices = 6) out;
+layout (triangle_strip, max_vertices = 4) out;
 
 in VS_OUT {
     int glyph;
     vec4 color;
+    // int angle;
+    // int size;
+    // int y_offset;
 } gs_in[];
 
 out vec2 text_pos;
@@ -17,55 +20,61 @@ precision highp samplerBuffer;
 uniform samplerBuffer font_vertices;
 
 uniform float font_scale;
+// uniform float italics;
+float padding = 2.0;
+
+float italics = 0.1;
 
 
 void main() {
     text_color = gs_in[0].color;
-    int _offset = 6 * gs_in[0].glyph;
+    int _offset = 8 * gs_in[0].glyph;
     vec2 text_offset = vec2(texelFetch(font_vertices, _offset + 0).r,
                             texelFetch(font_vertices, _offset + 1).r);
-    vec2 text_size = vec2(texelFetch(font_vertices, _offset + 2).r,
-                          texelFetch(font_vertices, _offset + 3).r);
-    vec4 bearing = vec4(texelFetch(font_vertices, _offset + 4).r,
-                        texelFetch(font_vertices, _offset + 5).r, 0.0, 0.0);
+    vec2 glyph_texture_width = vec2(texelFetch(font_vertices, _offset + 2).r, 0.0 );
+    vec2 glyph_texture_height = vec2(0.0, texelFetch(font_vertices, _offset + 3).r);
 
-    // Top left triangle
-    // TL
-    gl_Position = projection * (gl_in[0].gl_Position + (bearing / font_scale));
+    vec4 bearing = vec4(texelFetch(font_vertices, _offset + 4).r,
+                        texelFetch(font_vertices, _offset + 5).r, 0.0, 0.0) * 1.0;
+
+
+    vec4 glyph_width = vec4(texelFetch(font_vertices, _offset + 6).r, 0.0, 0.0, 0.0);
+    vec4 glyph_height = vec4(0.0, texelFetch(font_vertices, _offset + 7).r, 0.0, 0.0);
+
+    vec4 padding_x = vec4(padding, 0.0, 0.0, 0.0);
+    vec4 padding_y = vec4(0.0, padding, 0.0, 0.0);
+
+    vec4 p = gl_in[0].gl_Position;
+    vec4 _p = p;
+
+    // BL
+    _p = p + bearing + glyph_height - padding_x + padding_y;
+    _p.x += italics * (p.y - _p.y);
+    gl_Position = projection * _p;
     text_pos = text_offset;
     EmitVertex();
 
-    // TR
-    gl_Position = projection * (gl_in[0].gl_Position + 
-                                (bearing + vec4(text_size.x , 0.0, 0.0, 0.0)) / font_scale);
-    text_pos = text_offset + vec2(text_size.x, 0.0);
-    EmitVertex();
-
-    // BL
-    gl_Position = projection * (gl_in[0].gl_Position + 
-                                (bearing + vec4(0.0, text_size.y , 0.0, 0.0)) / font_scale);
-    text_pos = text_offset + vec2(0.0, text_size.y);
-    EmitVertex();
-
-
-    // Bottom right triangle
-    // TR
-    gl_Position = projection * (gl_in[0].gl_Position + 
-                                (bearing + vec4(0.0, text_size.y , 0.0, 0.0)) / font_scale);
-    text_pos = text_offset + vec2(0.0, text_size.y);
-    EmitVertex();
-
-    // BL
-    gl_Position = projection * (gl_in[0].gl_Position + 
-                                (bearing + vec4(text_size.x , 0.0, 0.0, 0.0)) / font_scale);
-    text_pos = text_offset + vec2(text_size.x, 0.0);
-    EmitVertex();
-
     // BR
-    gl_Position = projection * (gl_in[0].gl_Position + 
-                                (bearing + vec4(text_size.x, text_size.y , 0.0, 0.0)) / font_scale);
-    text_pos = text_offset + text_size;
+    _p = p + bearing + glyph_height + glyph_width + padding_x + padding_y;
+    _p.x += italics * (p.y - _p.y);
+    gl_Position = projection * _p;
+    text_pos = text_offset + glyph_texture_width;
+    EmitVertex();
+
+    // TL
+    _p = p + bearing - padding_x - padding_y;
+    _p.x += italics * (p.y - _p.y);
+    gl_Position = projection * _p;
+    text_pos = text_offset + glyph_texture_height;
+    EmitVertex();
+
+    // TR
+    _p = p + bearing + glyph_width + padding_x - padding_y;
+    _p.x += italics * (p.y - _p.y);
+    gl_Position = projection * _p;
+    text_pos = text_offset + glyph_texture_width + glyph_texture_height;
     EmitVertex();
 
     EndPrimitive();
+
 }

@@ -18,6 +18,22 @@
 struct window;
 struct frame;
 
+struct display_info {
+
+    struct wl_dsplay *display;
+    struct wl_compositor *compositor;
+    struct xdg_wm_base *xdg_wm_base;
+    EGLDisplay gl_display;
+    EGLConfig gl_conf;
+    EGLContext root_context;
+
+    struct frame *root_frame;
+};
+
+
+
+extern struct frame *selected_frame;
+
 struct frame {
 
     struct frame *next;
@@ -122,6 +138,9 @@ struct font {
 
     int horizontal_advances[254];
 };
+
+#define FOR_EACH_WINDOW(frame, w) \
+    for (struct window *w = frame->root_window; w; w = w->next)
 
 
 struct gl_glyph {GLfloat x; GLfloat y; GLuint c; GLint k;};

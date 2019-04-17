@@ -159,7 +159,7 @@ void init_egl() {
         EGL_ALPHA_SIZE, 1,
         EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
         EGL_SAMPLE_BUFFERS, 1,
-        EGL_SAMPLES, 4,  // This is for 4x MSAA.
+        /* EGL_SAMPLES, 4,  // This is for 4x MSAA. */
         EGL_NONE
     };
     g_gl_display = platform_get_egl_display(EGL_PLATFORM_WAYLAND_KHR, g_display, NULL);
@@ -199,22 +199,8 @@ struct font *load_font(const char *font_name, int height) {
     active_font = f;
     f->texture_size = FONT_BUFFER_SIZE;
 
-    /* if (!ft && FT_Init_FreeType(&ft)) { */
-    /*     fprintf(stderr, "Could not init freetype library\n"); */
-    /*     return NULL; */
-    /* } */
-    /* if (FT_New_Face(ft, font_name, 0, &face)) { */
-    /*     fprintf(stderr, "Could not init font\n"); */
-    /*     return NULL; */
-    /* } */
-    /* FT_Set_Pixel_Sizes(face, 0, height * 2.0); */
     msdf_font_handle msdf_font = msdf_load_font(font_name);
 
-    /* f->vertical_advance = face->size->metrics.height >> (6 + 1); */
-    fprintf(stderr, "vertical_advance = %.2f\n",
-            msdf_font->height);
-
-    /* f->vertical_advance = 17; */
     f->vertical_advance = msdf_font->height;
 
     eglMakeCurrent(g_gl_display, EGL_NO_SURFACE, EGL_NO_SURFACE, g_root_ctx);
@@ -229,8 +215,6 @@ struct font *load_font(const char *font_name, int height) {
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, f->texture);
 
-    /* glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, f->texture_size, f->texture_size, */
-    /*              0, GL_RED, GL_UNSIGNED_BYTE, 0); */
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, f->texture_size, f->texture_size,
                  0, GL_RGB, GL_FLOAT, 0);
 
@@ -245,8 +229,6 @@ struct font *load_font(const char *font_name, int height) {
     int offset_x = 0, offset_y = 0, y_increment = 0;
 
     for (unsigned int i = 0; i < 254; ++i) {
-        /* FT_Load_Char(face, i, FT_LOAD_RENDER); */
-        /* FT_GlyphSlot _g = face->glyph; */
         msdf_glyph_handle g = msdf_generate_glyph(msdf_font, i, 4.0, 1.0);
 
         if (offset_x + g->bitmap.width > FONT_BUFFER_SIZE) {
@@ -254,19 +236,11 @@ struct font *load_font(const char *font_name, int height) {
             offset_x = 0;
         }
 
-        /* if (i == 'a') { */
-        /*     fprintf(stderr, "OLD: bitmap: %ix%i, bearing: %i, %i\n", _g->bitmap.width, */
-        /*             _g->bitmap.rows, _g->bitmap_left, _g->bitmap_top); */
-        /*     fprintf(stderr, "NEW: bitmap: %ix%i, bearing: %.2f, %.2f\n", g->bitmap.width, */
-        /*             g->bitmap.height, g->bearing[0], g->bearing[1]); */
-        /* } */
-
         glActiveTexture(GL_TEXTURE0);
         glTexSubImage2D(GL_TEXTURE_2D, 0, offset_x, offset_y, g->bitmap.width,
                         g->bitmap.height, GL_RGB, GL_FLOAT, g->bitmap.data);
         y_increment = y_increment > g->bitmap.height ? y_increment : g->bitmap.height;
 
-        /* f->horizontal_advances[i] = g->advance.x >> (6 + 1); */
         f->horizontal_advances[i] = g->advance;
 
         float _buf[] = {
@@ -294,9 +268,6 @@ struct font *load_font(const char *font_name, int height) {
 
     glBindTexture(GL_TEXTURE_BUFFER, 0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-    /* FT_Done_Face(face); */
-    /* FT_Done_FreeType(ft); */
 
     return f;
 }
@@ -399,7 +370,6 @@ struct frame *frame_create() {
     f->font_projection_uniform = glGetUniformLocation(f->text_shader, "font_projection");
     f->font_vertex_uniform = glGetUniformLocation(f->text_shader, "font_vertices");
     f->font_texture_uniform = glGetUniformLocation(f->text_shader, "font_texure");
-    /* f->font_scale_uniform = glGetUniformLocation(f->text_shader, "font_scale"); */
     f->font_padding_uniform = glGetUniformLocation(f->text_shader, "padding");
     f->offset_uniform = glGetUniformLocation(f->text_shader, "offset");
     glUniform1i(f->font_texture_uniform, 0);
@@ -637,7 +607,6 @@ void window_render(struct window *w) {
         if (vscroll_lines > -w->position[0] + (w->height + active_font->vertical_advance * 8.5)) break;
         int _n = sprintf(buf, "%*d", ncols, i + 1);
         draw_text(col_width, active_font->vertical_advance * 8.5 * (i + 1), buf, _n,
-                  /* active_font, 0x888888ff /\* color *\/, w, false /\* flush *\/); */
                   active_font, 0x0a3749ff /* color */, w, false /* flush */);
     }
     draw_text(0, 0, "", 0, active_font, 0, w, true /* flush */);

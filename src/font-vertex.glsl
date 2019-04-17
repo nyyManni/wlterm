@@ -16,7 +16,7 @@ out VS_OUT {
     float size;
     float y_offset;
     float skewness;
-        
+
 } vs_out;
 
 void main() {
@@ -26,8 +26,6 @@ void main() {
     vs_out.color = vec4(float(c.a) / 255.0, float(c.b) / 255.0,
                         float(c.g) / 255.0, float(c.r) / 255.0);
     vs_out.size = size;
-    // vs_out.color = vec4(1.0, 1.0, 1.0, 1.0);
-    // vs_out.size = 8.5;
     vs_out.y_offset = y_offset;
     vs_out.skewness = skewness;
 }

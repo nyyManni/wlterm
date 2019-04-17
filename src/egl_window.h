@@ -71,7 +71,8 @@ struct frame {
     GLuint font_projection_uniform;
     GLuint font_texture_uniform;
     GLuint font_vertex_uniform;
-    GLuint font_scale_uniform;
+    /* GLuint font_scale_uniform; */
+    GLuint font_padding_uniform;
 
     GLuint overlay_projection_uniform;
     GLuint overlay_offset_uniform;
@@ -134,16 +135,24 @@ struct font {
 
     int texture_size;
 
-    int vertical_advance;
+    float vertical_advance;
 
-    int horizontal_advances[254];
+    float horizontal_advances[254];
 };
 
 #define FOR_EACH_WINDOW(frame, w) \
     for (struct window *w = frame->root_window; w; w = w->next)
 
 
-struct gl_glyph {GLfloat x; GLfloat y; GLuint c; GLint k;};
+struct gl_glyph {
+    GLfloat x;
+    GLfloat y; 
+    GLuint color;
+    GLint key;
+    GLfloat size;
+    GLfloat offset;
+    GLfloat skew;
+};
 struct gl_overlay_vertex {GLfloat x; GLfloat y; GLuint c;};
 
 void init_egl();

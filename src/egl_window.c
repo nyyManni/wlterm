@@ -159,7 +159,7 @@ void init_egl() {
         EGL_ALPHA_SIZE, 1,
         EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
         EGL_SAMPLE_BUFFERS, 1,
-        /* EGL_SAMPLES, 4,  // This is for 4x MSAA. */
+        EGL_SAMPLES, 4,  // This is for 4x MSAA.
         EGL_NONE
     };
     g_gl_display = platform_get_egl_display(EGL_PLATFORM_WAYLAND_KHR, g_display, NULL);
@@ -211,7 +211,11 @@ struct font *load_font(const char *font_name, int height) {
     msdf_font_handle msdf_font = msdf_load_font(font_name);
 
     /* f->vertical_advance = face->size->metrics.height >> (6 + 1); */
-    f->vertical_advance = 32;
+    fprintf(stderr, "vertical_advance = %.2f\n",
+            msdf_font->height);
+
+    /* f->vertical_advance = 17; */
+    f->vertical_advance = msdf_font->height;
 
     eglMakeCurrent(g_gl_display, EGL_NO_SURFACE, EGL_NO_SURFACE, g_root_ctx);
     eglSwapInterval(g_gl_display, 0);
@@ -395,7 +399,8 @@ struct frame *frame_create() {
     f->font_projection_uniform = glGetUniformLocation(f->text_shader, "font_projection");
     f->font_vertex_uniform = glGetUniformLocation(f->text_shader, "font_vertices");
     f->font_texture_uniform = glGetUniformLocation(f->text_shader, "font_texure");
-    f->font_scale_uniform = glGetUniformLocation(f->text_shader, "font_scale");
+    /* f->font_scale_uniform = glGetUniformLocation(f->text_shader, "font_scale"); */
+    f->font_padding_uniform = glGetUniformLocation(f->text_shader, "padding");
     f->offset_uniform = glGetUniformLocation(f->text_shader, "offset");
     glUniform1i(f->font_texture_uniform, 0);
     glUniform1i(f->font_vertex_uniform, 1);
@@ -426,12 +431,12 @@ void draw_text(int x, int y, char *text, size_t len, struct font *font,
 
 
     int base_x = x;
-    int col_width = active_font->horizontal_advances['8'];
+    int col_width = active_font->horizontal_advances['8'] * 8.5;
     int tab_width = 8;
     for (size_t i = 0; i < len; ++i) {
         if (text[i] == '\n') {
             x = base_x;
-            y += font->vertical_advance;
+            y += font->vertical_advance * 8.5;
             continue;
         }
         if (text[i] == '\t') {
@@ -451,8 +456,8 @@ void draw_text(int x, int y, char *text, size_t len, struct font *font,
             glyph_count = 0;
         }
 
-        glyphs[glyph_count++] = (struct gl_glyph){x, y, color, text[i]};
-        x += font->horizontal_advances[text[i]];
+        glyphs[glyph_count++] = (struct gl_glyph){x, y, color, text[i], 8.5, 0.0, 0.1};
+        x += font->horizontal_advances[text[i]] * 8.5;
     }
 
     if (flush && glyph_count) {
@@ -535,7 +540,7 @@ void window_render(struct window *w) {
               w->height + (w->frame->height - w->height - w->x), -w->y,
               -1.0, 1.0, w->projection);
 
-    int modeline_h = active_font->vertical_advance;
+    int modeline_h = active_font->vertical_advance * 8.5;
     vec3 _color;
     parse_color("0c1014", _color);
     glClearColor(_color[0], _color[1], _color[2], 1.0);
@@ -545,7 +550,7 @@ void window_render(struct window *w) {
     draw_rect(0, w->height - modeline_h, w->width, modeline_h, "0a3749", w);
 
     int ncols = ceil(log10(w->nlines + 1));
-    int col_width = active_font->horizontal_advances['8'];
+    int col_width = active_font->horizontal_advances['8'] * 8.5;
 
     w->linum_width = col_width * (ncols + 2);  /* Empty column on both sides. */
 
@@ -572,19 +577,39 @@ void window_render(struct window *w) {
     glBindBuffer(GL_ARRAY_BUFFER, w->text_area_glyphs);
 
     glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 16, 0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE,
+                          sizeof(struct gl_glyph),
+                          (void *)offsetof(struct gl_glyph, x));
 
     glEnableVertexAttribArray(1);
-    glVertexAttribIPointer(1, 4, GL_UNSIGNED_BYTE, 16, (void *)8);
+    glVertexAttribIPointer(1, 4, GL_UNSIGNED_BYTE,
+                           sizeof(struct gl_glyph),
+                           (void *)offsetof(struct gl_glyph, color));
 
     glEnableVertexAttribArray(2);
-    glVertexAttribIPointer(2, 1, GL_INT, 16, (void *)12);
+    glVertexAttribIPointer(2, 1, GL_INT,
+                           sizeof(struct gl_glyph),
+                           (void *)offsetof(struct gl_glyph, key));
+
+    glEnableVertexAttribArray(3);
+    glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE,
+                          sizeof(struct gl_glyph),
+                          (void *)offsetof(struct gl_glyph, size));
+
+    glEnableVertexAttribArray(4);
+    glVertexAttribPointer(4, 1, GL_FLOAT, GL_FALSE,
+                           sizeof(struct gl_glyph),
+                          (void *)offsetof(struct gl_glyph, offset));
+
+    glEnableVertexAttribArray(5);
+    glVertexAttribPointer(5, 1, GL_FLOAT,GL_FALSE,
+                           sizeof(struct gl_glyph),
+                          (void *)offsetof(struct gl_glyph, skew));
 
     glUseProgram(w->frame->text_shader);
     glUniformMatrix4fv(w->frame->projection_uniform, 1, GL_FALSE, (GLfloat *) w->projection);
     glUniformMatrix4fv(w->frame->font_projection_uniform, 1, GL_FALSE, (GLfloat *) font->texture_projection);
-    /* glUniform1f(w->frame->font_scale_uniform, w->frame->scale); */
-    glUniform1f(w->frame->font_scale_uniform, 1.0);
+    glUniform1f(w->frame->font_padding_uniform, 2.0 / 17.5);
     glUniform2f(w->frame->offset_uniform, w->position[1] + w->linum_width, w->position[0]);
     glUniform1i(w->frame->font_texture_uniform, 0);
     glUniform1i(w->frame->font_vertex_uniform, 1);
@@ -592,10 +617,10 @@ void window_render(struct window *w) {
     /* Draw buffer text. */
     if (w->contents) {
         for (int i = 0; i < w->nlines; ++i) {
-            int vscroll_lines = i * active_font->vertical_advance;
-            if (vscroll_lines < -w->position[0] - active_font->vertical_advance) continue;
-            if (vscroll_lines > -w->position[0] + (w->height + active_font->vertical_advance)) break;
-            draw_text(0.0, active_font->vertical_advance * (i + 1), w->contents[i], strlen(w->contents[i]),
+            int vscroll_lines = i * active_font->vertical_advance * 8.5;
+            if (vscroll_lines < -w->position[0] - active_font->vertical_advance * 8.5) continue;
+            if (vscroll_lines > -w->position[0] + (w->height + active_font->vertical_advance * 8.5)) break;
+            draw_text(0.0, active_font->vertical_advance * 8.5 * (i + 1), w->contents[i], strlen(w->contents[i]),
                   active_font, 0xffffffff /* color */, w, false /* flush */);
         }
         draw_text(0.0, 0.0, "", 0, active_font, 0, w, true /* flush */);
@@ -607,11 +632,11 @@ void window_render(struct window *w) {
 
     /* Draw line numbers */
     for (int i = 0; i < w->nlines; ++i) {
-        int vscroll_lines = i * active_font->vertical_advance;
-        if (vscroll_lines < -w->position[0] - active_font->vertical_advance) continue;
-        if (vscroll_lines > -w->position[0] + (w->height + active_font->vertical_advance)) break;
+        int vscroll_lines = i * active_font->vertical_advance * 8.5;
+        if (vscroll_lines < -w->position[0] - active_font->vertical_advance * 8.5) continue;
+        if (vscroll_lines > -w->position[0] + (w->height + active_font->vertical_advance * 8.5)) break;
         int _n = sprintf(buf, "%*d", ncols, i + 1);
-        draw_text(col_width, active_font->vertical_advance * (i + 1), buf, _n,
+        draw_text(col_width, active_font->vertical_advance * 8.5 * (i + 1), buf, _n,
                   /* active_font, 0x888888ff /\* color *\/, w, false /\* flush *\/); */
                   active_font, 0x0a3749ff /* color */, w, false /* flush */);
     }
@@ -620,6 +645,9 @@ void window_render(struct window *w) {
     glDisableVertexAttribArray(0);
     glDisableVertexAttribArray(1);
     glDisableVertexAttribArray(2);
+    glDisableVertexAttribArray(3);
+    glDisableVertexAttribArray(4);
+    glDisableVertexAttribArray(5);
     glBindVertexArray(0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 
@@ -643,8 +671,8 @@ void window_render(struct window *w) {
     glVertexAttribIPointer(1, 4, GL_UNSIGNED_BYTE, 12, (void *)8);
     glLineWidth(2.0 * w->frame->scale);
     struct gl_overlay_vertex overlays[] = {
-        {8 * col_width, 2 * active_font->vertical_advance, 0xc23127ff},
-        {11 * col_width, 2 * active_font->vertical_advance, 0xc23127ff},
+        {8 * col_width, 2 * active_font->vertical_advance * 8.5, 0xc23127ff},
+        {11 * col_width, 2 * active_font->vertical_advance * 8.5, 0xc23127ff},
         /* {3 * col_width, 30 * active_font->vertical_advance, 0xc23127ff}, */
         /* {15 * col_width, 30 * active_font->vertical_advance, 0xc23127ff}, */
     };

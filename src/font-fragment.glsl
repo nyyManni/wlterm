@@ -25,7 +25,7 @@ void main() {
 
     vec2 coords = (font_projection * vec4(text_pos, 0.0, 1.0)).xy;
     vec3 s = texture(font_texture, coords).rgb;
-    float alpha = median(s.r, s.g, s.b) > 0.5 ? 1.0 : 0.0;
+    float alpha = median(s.r, s.g, s.b) > 0.45 ? 1.0 : 0.0;
     vec4 sampled = vec4(1.0, 1.0, 1.0, alpha);
     color = text_color * sampled;
     // color = text_color;

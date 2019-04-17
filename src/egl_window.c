@@ -426,7 +426,7 @@ void draw_text(int x, int y, char *text, size_t len, struct font *font,
             glyph_count = 0;
         }
 
-        glyphs[glyph_count++] = (struct gl_glyph){x, y, color, text[i], 8.5, 0.0, 0.1};
+        glyphs[glyph_count++] = (struct gl_glyph){x, y, color, text[i], 8.5, 0.0, 0.1, 0.5};
         x += font->horizontal_advances[text[i]] * 8.5;
     }
 
@@ -575,6 +575,11 @@ void window_render(struct window *w) {
     glVertexAttribPointer(5, 1, GL_FLOAT,GL_FALSE,
                            sizeof(struct gl_glyph),
                           (void *)offsetof(struct gl_glyph, skew));
+
+    glEnableVertexAttribArray(6);
+    glVertexAttribPointer(6, 1, GL_FLOAT,GL_FALSE,
+                           sizeof(struct gl_glyph),
+                          (void *)offsetof(struct gl_glyph, strength));
 
     glUseProgram(w->frame->text_shader);
     glUniformMatrix4fv(w->frame->projection_uniform, 1, GL_FALSE, (GLfloat *) w->projection);

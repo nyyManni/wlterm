@@ -152,6 +152,7 @@ struct gl_glyph {
     GLfloat size;
     GLfloat offset;
     GLfloat skew;
+    GLfloat strength;
 };
 struct gl_overlay_vertex {GLfloat x; GLfloat y; GLuint c;};
 

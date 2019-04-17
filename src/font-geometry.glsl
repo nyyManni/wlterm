@@ -9,10 +9,12 @@ in VS_OUT {
     float size;
     float y_offset;
     float skewness;
+    float strength;
 } gs_in[];
 
 out vec2 text_pos;
 out vec4 text_color;
+out float strength;
 
 uniform mat4 projection;
 uniform float padding;
@@ -23,6 +25,7 @@ uniform samplerBuffer font_vertices;
 
 void main() {
     text_color = gs_in[0].color;
+    strength = gs_in[0].strength;
     float font_size = gs_in[0].size;
     int _offset = 8 * gs_in[0].glyph;
     vec2 text_offset = vec2(texelFetch(font_vertices, _offset + 0).r,

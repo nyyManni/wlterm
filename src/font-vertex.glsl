@@ -6,6 +6,7 @@ layout (location = 2) in int glyph_index;
 layout (location = 3) in float size;
 layout (location = 4) in float y_offset;
 layout (location = 5) in float skewness;
+layout (location = 6) in float strength;
 
 uniform mat4 projection;
 uniform vec2 offset;
@@ -16,6 +17,7 @@ out VS_OUT {
     float size;
     float y_offset;
     float skewness;
+    float strength;
 
 } vs_out;
 
@@ -28,4 +30,6 @@ void main() {
     vs_out.size = size;
     vs_out.y_offset = y_offset;
     vs_out.skewness = skewness;
+    vs_out.strength = strength;
+    // vs_out.strength = 0.4;
 }

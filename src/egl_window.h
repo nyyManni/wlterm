@@ -7,6 +7,7 @@
 
 #include <GLES2/gl2.h>
 #include <EGL/egl.h>
+#include <msdf.h>
 
 #include <cglm/mat4.h>
 
@@ -60,7 +61,6 @@ struct frame {
 
     mat4 projection;
 
-    GLuint shader_program;
     GLuint text_shader;
     GLuint bg_shader;
     GLuint overlay_shader;
@@ -71,8 +71,10 @@ struct frame {
     GLuint font_projection_uniform;
     GLuint font_texture_uniform;
     GLuint font_vertex_uniform;
-    /* GLuint font_scale_uniform; */
     GLuint font_padding_uniform;
+    
+    GLuint msdf_projection_uniform;
+    GLuint msdf_vertex_uniform;
 
     GLuint overlay_projection_uniform;
     GLuint overlay_offset_uniform;
@@ -131,6 +133,12 @@ struct font {
     GLuint texture;
     GLuint vertex_texture;
     GLuint vertex_buffer;
+
+    GLuint msdf_glyph_uniform;
+    GLuint msdf_glyph_texture;
+    GLuint msdf_atlas_texture;
+    GLuint msdf_framebuffer;
+
     mat4 texture_projection;
 
     int texture_size;
@@ -138,6 +146,9 @@ struct font {
     float vertical_advance;
 
     float horizontal_advances[254];
+    
+    msdf_font_handle msdf_font;
+
 };
 
 #define FOR_EACH_WINDOW(frame, w) \

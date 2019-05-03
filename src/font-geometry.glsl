@@ -19,7 +19,7 @@ out float strength;
 uniform mat4 projection;
 uniform float padding;
 
-precision highp samplerBuffer;
+precision mediump samplerBuffer;
 uniform samplerBuffer font_vertices;
 
 

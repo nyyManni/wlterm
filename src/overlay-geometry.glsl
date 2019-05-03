@@ -15,29 +15,37 @@ uniform mat4 projection;
 void main() {
     vec4 start = gl_in[0].gl_Position;
     vec4 end = gl_in[1].gl_Position;
-    float o = -2.0;
     
-    vec4 p = start;
-    p.y -= 1.0 * o;
-    p.y + 2.0;
-    gl_Position = projection * p;
-    overlay_color = gs_in[0].color;
+    overlay_color = vec4(1.0, 1.0, 1.0, 1.0);
+    
+    gl_Position = projection * start;
+    EmitVertex();
+    gl_Position = projection * end;
     EmitVertex();
 
-    while (p.x <= end.x - 2.0) {
-        p.x += 2.0;
-        p.y += o;
-        o = -1.0 * o;
-        gl_Position = projection * p;
-        overlay_color = gs_in[0].color;
-        EmitVertex();
-    }
+    // float o = -2.0;
+    
+    // vec4 p = start;
+    // p.y -= 1.0 * o;
+    // p.y + 2.0;
+    // gl_Position = projection * p;
+    // overlay_color = gs_in[0].color;
+    // EmitVertex();
 
-    overlay_color = gs_in[0].color;
-    p.y += o * (end.x - p.x) / 2.0;
-    p.x = end.x;
-    gl_Position = projection * p;
-    EmitVertex();
+    // while (p.x <= end.x - 2.0) {
+    //     p.x += 2.0;
+    //     p.y += o;
+    //     o = -1.0 * o;
+    //     gl_Position = projection * p;
+    //     overlay_color = gs_in[0].color;
+    //     EmitVertex();
+    // }
+
+    // overlay_color = gs_in[0].color;
+    // p.y += o * (end.x - p.x) / 2.0;
+    // p.x = end.x;
+    // gl_Position = projection * p;
+    // EmitVertex();
 
     EndPrimitive();
 }

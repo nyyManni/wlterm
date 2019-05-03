@@ -31,5 +31,4 @@ void main() {
     vs_out.y_offset = y_offset;
     vs_out.skewness = skewness;
     vs_out.strength = strength;
-    // vs_out.strength = 0.4;
 }

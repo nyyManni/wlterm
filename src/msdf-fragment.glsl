@@ -4,6 +4,7 @@ precision mediump float;
 
 precision mediump samplerBuffer;
 uniform samplerBuffer glyph_metrics;
+uniform vec2 offset;
 
 out vec4 color;
 
@@ -64,7 +65,8 @@ out vec4 color;
 
 void main() {
     // workspace ws;
+    float red = (gl_FragCoord.y - offset.y) / 54.0;
     
-    color = vec4(1.0, 1.0, 0.0, 1.0);
+    color = vec4(1.0, 1.0, red, 1.0);
     // color = vec4(255.0, 255.0, 255.0, 255.0);
 }

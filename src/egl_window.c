@@ -244,8 +244,8 @@ void generate_msdf_atlas(const char *font_name, float scale, float range) {
     int glyph_width, glyph_height;
     msdf_serialize_glyph(msdf_font, character, metadata, point_data, &glyph_width, &glyph_height);
     
-    ((unsigned char *)metadata)[0] = 128;
-    ((float *)point_data)[0] = 0.85;
+    /* ((unsigned char *)metadata)[0] = 128; */
+    /* ((float *)point_data)[0] = 0.85; */
 
     eglMakeCurrent(g_gl_display, EGL_NO_SURFACE, EGL_NO_SURFACE, g_root_ctx);
     eglSwapInterval(g_gl_display, 0);
@@ -284,13 +284,9 @@ void generate_msdf_atlas(const char *font_name, float scale, float range) {
     glActiveTexture(GL_TEXTURE3);
     glBindTexture(GL_TEXTURE_BUFFER, point_texture);
     /* glTexParameteri(GL_TEXTURE_BUFFER, GL_TEXTURE_MIN_FILTER, GL_NEAREST); */
-    /* CHECK_ERROR */
     /* glTexParameteri(GL_TEXTURE_BUFFER, GL_TEXTURE_MAG_FILTER, GL_NEAREST); */
-    /* CHECK_ERROR */
     /* glTexParameteri(GL_TEXTURE_BUFFER, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); */
-    /* CHECK_ERROR */
     /* glTexParameteri(GL_TEXTURE_BUFFER, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE); */
-    /* CHECK_ERROR */
 
     glTexBuffer(GL_TEXTURE_BUFFER, GL_R32F, point_buffer);
 
@@ -382,7 +378,8 @@ void generate_msdf_atlas(const char *font_name, float scale, float range) {
     glDrawArrays(GL_TRIANGLES, 0, 6);
     glUniform2f(g_msdf_offset_uniform, 50, 10);
 
-    glDrawArrays(GL_TRIANGLES, 0, 6);
+    for (int i = 0; i < 255; ++i)
+        glDrawArrays(GL_TRIANGLES, 0, 6);
 
     glDisableVertexAttribArray(0);
 

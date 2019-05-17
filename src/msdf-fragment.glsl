@@ -52,7 +52,7 @@ void main() {
     vec2 coords = gl_FragCoord.xy - offset;
     vec2 p = vec2((coords.x + 0.5) / scale.x - translate.x,
                   (coords.y + 0.5) / scale.y - translate.y);
-    
+
     ws.maximums[0].r = -INFINITY;
     ws.maximums[1].r = -INFINITY;
     ws.maximums[0].g = -INFINITY;
@@ -71,19 +71,55 @@ void main() {
     int point_index = 0;
     int meta_index = 0;
 
-    mat3x2 v;
+    uint ncontours = texelFetch(metadata, meta_index++).r;
+    for (uint _i = 0u; _i < ncontours; ++_i) {
+        int winding = int(texelFetch(metadata, meta_index++).r) - 1;
+        uint nsegments = texelFetch(metadata, meta_index++).r;
 
-    // ws.shape.r.near_param = 0.1;
-    // float red = (gl_FragCoord.y - offset.y) / 54.0;
-    float red = p.y / 14.0;
-    float green = p.x / 14.0;
-    
-    color = vec4(1.0, green, red, 1.0);
-    // color = vec4(255.0, 255.0, 255.0, 255.0);
+        uint s_color = texelFetch(metadata, meta_index).r;
+        uint s_npoints = texelFetch(metadata, meta_index + 1).r;
+
+        int cur_points = point_index;
+        uint cur_color = texelFetch(metadata, meta_index + 2 * int(nsegments - 1u)).r;
+        uint cur_npoints = texelFetch(metadata, meta_index + 2 * int(nsegments - 1u) + 1).r;
+
+        uint prev_npoints = nsegments >= 2u ?
+            texelFetch(metadata, meta_index + 2 * int(nsegments - 2u) + 1).r
+            : s_npoints;
+        int prev_points = point_index;
+
+        for (uint _i = 0u; _i < nsegments - 1u; ++_i) {
+            uint npoints = texelFetch(metadata, meta_index + 2 * int(_i) + 1).r;
+            cur_points += int(npoints) - 1;
+        }
+
+        for (uint _i = 0u; _i < nsegments - 2u && nsegments >= 2u; ++_i) {
+            uint npoints = texelFetch(metadata, meta_index + 2 * int(_i) + 1).r;
+            prev_points += int(npoints) - 1;
+        }
+
+        for (uint _i = 0u; _i < nsegments; ++_i) {
+
+            // add_segment
+
+            prev_points = cur_points;
+            prev_npoints = cur_npoints;
+            cur_points = point_index;
+            cur_npoints = s_npoints;
+            cur_color = s_color;
+
+            s_color = texelFetch(metadata, meta_index++ + 2).r;
+            point_index += int(s_npoints) - 1;
+            s_npoints = texelFetch(metadata, meta_index++ + 2).r;
+        }
+        point_index += 1;
+
+        // set_contour_edge
+    }
+
+    // get_pixel_distance
+
     float gray = 0.5;
-    // gray = texelFetch(point_data, 0).r * texelFetch(metadata, 0).r;
-    gray = float(texelFetch(metadata, 0).r) / 255.0;
-    // gray = texelFetch(point_data, 0).r;
     color = vec4(gray, gray, gray, 1.0);
 }
 

@@ -300,7 +300,6 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-
     struct frame *f = frame_create();
 
     if (argc > 1) {

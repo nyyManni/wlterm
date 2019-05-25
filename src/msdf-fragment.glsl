@@ -14,72 +14,17 @@
 
 
 precision mediump float;
-// precision mediump float[];
-const uint mdata[] = uint[] (
-                             1u,
-                             2u,
-                             12u,
-                             6u,
-                             2u,
-                             5u,
-                             2u,
-                             3u,
-                             2u,
-                             6u,
-                             2u,
-                             5u,
-                             2u,
-                             3u,
-                             2u,
-                             6u,
-                             2u,
-                             5u,
-                             2u,
-                             3u,
-                             2u,
-                             6u,
-                             2u,
-                             5u,
-                             2u,
-                             3u,
-                             2u
-                             );
-
-
-const float pdata[] = float[] (10.9375, 18.2969,
-                               10.9375, 11.3594,
-
-                               17.8906, 11.3594,
-
-                               17.8906, 8.7031,
-
-                               10.9375, 8.7031,
-
-                               10.9375, 1.7656,
-
-                               8.3125,  1.7656,
-
-                               8.3125,  8.7031,
-
-                               1.3750,  8.7031,
-
-                               1.3750,  11.3594,
-
-                               8.3125,  11.3594,
-
-                               8.3125,  18.2969,
-
-                               10.9375, 18.2969);
 
 precision mediump samplerBuffer;
 precision mediump usamplerBuffer;
-uniform usamplerBuffer metadata;
-uniform samplerBuffer point_data;
+layout (binding = 0) uniform usamplerBuffer metadata;
+layout (binding = 1) uniform samplerBuffer point_data;
 
-// #define meta_at(i) texelFetch(metadata, int(i)).r
-#define point_at(i) texelFetch(point_data, 2 * int(i)).xy
+#define meta_at(i) texelFetch(metadata, int(i)).r
+#define point_at(i) vec2(texelFetch(point_data, 2 * int(i)).r, texelFetch(point_data, 2 * int(i) + 1).r)
 
-#define meta_at(i) mdata[i]
+
+// #define meta_at(i) mdata[i]
 // #define point_at(i) vec2(pdata[2*(i)], pdata[(2*(i))+1])
 
 uniform vec2 offset;
@@ -148,6 +93,9 @@ void main() {
     min_distance_b = 0.0;
     // vec2 tr = vec2(0.0, 0.0);
 
+    // color = point_at(0).y > 18.0 ? vec4(1.0, 0.0, 0.0, 1.0) : vec4(0.0, 0.0, 0.0, 1.0);
+
+    // return;
     // vec2 sc = vec2(0.5, 0.5);
     // float r = 4.0;
     // first = true;

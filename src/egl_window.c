@@ -229,7 +229,7 @@ void kill_egl() {
 GLuint meta_texture, point_texture;
 void generate_msdf_atlas(const char *font_name, float scale, float range) {
     /* int character = '/'; */
-    int character = '+';
+    int character = 'a';
     struct font *f = malloc(sizeof (struct font));
 
     msdf_font_handle msdf_font = msdf_load_font(font_name);
@@ -263,6 +263,10 @@ void generate_msdf_atlas(const char *font_name, float scale, float range) {
 
     glBindBuffer(GL_ARRAY_BUFFER, point_buffer);
     glBufferData(GL_ARRAY_BUFFER, point_data_size, 0, GL_STATIC_READ);
+    
+    
+    /* ((float *)point_data)[0] = 1.0; */
+
     glBufferSubData(GL_ARRAY_BUFFER, 0, point_data_size, point_data);
     
     glBindBuffer(GL_ARRAY_BUFFER, 0);

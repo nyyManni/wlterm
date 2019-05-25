@@ -23,10 +23,6 @@ layout (binding = 1) uniform samplerBuffer point_data;
 #define meta_at(i) texelFetch(metadata, int(i)).r
 #define point_at(i) vec2(texelFetch(point_data, 2 * int(i)).r, texelFetch(point_data, 2 * int(i) + 1).r)
 
-
-// #define meta_at(i) mdata[i]
-// #define point_at(i) vec2(pdata[2*(i)], pdata[(2*(i))+1])
-
 uniform vec2 offset;
 
 uniform vec2 translate;
@@ -85,48 +81,13 @@ bool less(vec2 a, vec2 b) {
     return abs(a.x) < abs(b.x) || (abs(a.x) == abs(b.x) && a.y < b.y);
 }
 
-float min_distance;
-float min_distance_b;
 
 void main() {
-    min_distance = 0.0;
-    min_distance_b = 0.0;
-    // vec2 tr = vec2(0.0, 0.0);
-
-    // color = point_at(0).y > 18.0 ? vec4(1.0, 0.0, 0.0, 1.0) : vec4(0.0, 0.0, 0.0, 1.0);
-
-    // return;
-    // vec2 sc = vec2(0.5, 0.5);
-    // float r = 4.0;
-    // first = true;
-    // seg_i = 0;
     vec2 coords = gl_FragCoord.xy - offset;
-
-    vec2 p = ((coords + 0.5) / scale) - translate;
-    // vec2 p = vec2((coords.x + 0.5) / scale.x - translate.x,
-    //               (coords.y + 0.5) / scale.y - translate.y);
-    // p = vec2((coords.x + 0.5), coords.y)
-    // p = coords + 0.5;
-    // p = gl_FragCoord.xy * 1.0;
-    // p.xy = p.yx;
-    // p.y = -p.y * 3.0;
-    // p = vec2(5.0, 5.0);
-    // p.y -= 10.0;
-    // p.x -= 5.0;
-    // p /= 3.0;
-    // p -= 10.0;
-    // float min_distance = INFINITY;
-    // float min_distance = 0.0;
-    // for (int _i_ = 0; _i_ < 24; ++_i_) {
-    //     min_distance += (1.0 / (5.0 *distance(p, point_at(_i_))));
-    // }
-    // // min_distance += (1.0 / (50.0 * distance(p, vec2(5.0, 2.0))));
-    // // min_distance += (1.0 / (50.0 * distance(p, vec2(10.0, 7.0))));
-
-    // color = vec4(min_distance, 0.0, 0.0, 1.0);
-    // return;
     
-    // p *= 0.2;
+    // Exactly 0.5 causes a strange artifact
+    vec2 p = ((coords + 0.4999) / scale) - translate;
+    p -= range / 2.0;
 
     ws.maximums[0].r = -INFINITY;
     ws.maximums[1].r = -INFINITY;
@@ -150,101 +111,61 @@ void main() {
     int meta_index = 0;
     
 
-    // uint ncontours = texelFetch(metadata, meta_index++).r;
     uint ncontours = meta_at(meta_index++);
     for (uint _i = 0u; _i < ncontours; ++_i) {
         int winding = int(meta_at(meta_index++)) - 1;
-        // int winding = int(texelFetch(metadata, meta_index++).r) - 1;
-        // uint nsegments = texelFetch(metadata, meta_index++).r;
-        // uint nsegments
         uint nsegments = meta_at(meta_index++);
 
         uint s_color = meta_at(meta_index);
         uint s_npoints = meta_at(meta_index + 1);
-        // uint s_color = texelFetch(metadata, meta_index).r;
-        // uint s_npoints = texelFetch(metadata, meta_index + 1).r;
 
         int cur_points = point_index;
         uint cur_color = meta_at(meta_index + 2 * (int(nsegments) - 1));
         uint cur_npoints = meta_at(meta_index + 2 * (int(nsegments) - 1) + 1);
-        // uint cur_color = texelFetch(metadata, meta_index + 2 * int(nsegments - 1u)).r;
-        // uint cur_npoints = texelFetch(metadata, meta_index + 2 * int(nsegments - 1u) + 1).r;
 
 
         uint prev_npoints = nsegments >= 2u ?
             meta_at(meta_index + 2 * (int(nsegments) - 2) + 1) : s_npoints;
-            // texelFetch(metadata, meta_index + 2 * int(nsegments - 2u) + 1).r
-            // : s_npoints;
         int prev_points = point_index;
 
         for (uint _i = 0u; _i < nsegments - 1u; ++_i) {
             uint npoints = meta_at(meta_index + 2 * int(_i) + 1);
-            // npoints = 2u;
-            // uint npoints = texelFetch(metadata, meta_index + 2 * int(_i) + 1).r;
             cur_points += (int(npoints) - 1);
         }
 
         for (uint _i = 0u; _i < nsegments - 2u && nsegments >= 2u; ++_i) {
             uint npoints = meta_at(meta_index + 2 * int(_i) + 1);
-            // npoints = 2u;
-            // uint npoints = texelFetch(metadata, meta_index + 2 * int(_i) + 1).r;
             prev_points += (int(npoints) - 1);
         }
 
         for (uint _i = 0u; _i < nsegments; ++_i) {
-        // for (uint _i = 0u; _i < 1u; ++_i) {
-            // cur_points = 5;
+
+            prev_points = cur_points;
+            prev_npoints = cur_npoints;
 
             add_segment(int(prev_npoints), prev_points, int(cur_npoints), cur_points,
                         int(s_npoints), point_index, cur_color, p);
 
-            prev_points = cur_points;
-            prev_npoints = cur_npoints;
+            // prev_points = cur_points;
+            // prev_npoints = cur_npoints;
             cur_points = point_index;
             cur_npoints = s_npoints;
             cur_color = s_color;
 
-            // float distance_ = distance(p, point_at(0));
-            // distance_ = distance(p, vec2(10.0, 15.0));
-            // min_distance = min(min_distance, distance_);
-
-            // s_color = texelFetch(metadata, meta_index++ + 2).r;
             s_color = meta_at(meta_index++ + 2);
             point_index += (int(s_npoints) - 1);
-            // s_npoints = texelFetch(metadata, meta_index++ + 2).r;
             s_npoints = meta_at(meta_index++ + 2);
-            // s_npoints = 2u;
-            // s_npoints = 2u;
-            // break;
         }
         point_index += 1;
 
         set_contour_edge(winding, p);
-        // break;
     }
 
     vec3 d = get_pixel_distance(p);
-    
-    // for (int _i_ = 0; _i_ < 24; ++_i_) {
-    //     min_distance += (1.0 / (10.0 *distance(p, point_at(_i_))));
-    // }
 
-    color = vec4(min_distance, min_distance_b, 0.0, 1.0);
     color = vec4(d / range + 0.5, 1.0);
-    // float gray = median(color.rgb) > 0.5 ? 1.0 : 0.0;
-    // color.r = gray;
-    // color.g = gray;
-    // color.b = gray;
-    // color.rgb = median(color.rgb);
-    // color.r = 0.0;
-    // color.g = 0.0;
-    // color.b = p.y / 20.0;
-    // if (coords.y < 3.0)
-    //     color.r = 1.0;
-    // else
-    //     color.r = 0.0;
-
-    // color.r = texelFetch(point_data, point_index - 4).r / 30.0;
+    
+    // color = median(color.rgb) > 0.5 ? vec4(1.0, 1.0, 1.0, 1.0) : vec4(0.0, 0.0, 0.0, 1.0);
 }
 
 void merge_segment(int s, int other) {
@@ -281,36 +202,6 @@ void add_segment(int prev_npoints, int prev_points, int cur_npoints, int cur_poi
                                  point_at(cur_points + 2),
                                  point);
 
-
-    min_distance += 1.0 / (50.0 * length(d) * length(d));
-    min_distance_b += 1.0 / (5.0 * distance(point, point_at(cur_points)));
-    min_distance_b += 1.0 / (5.0 * distance(point, point_at(cur_points + 1)));
-        // d = signed_distance_linear(texelFetch(point_data, cur_points).rg,
-        //                            texelFetch(point_data, (cur_points + 1)).rg,
-        //                            point);
-        // d = signed_distance_linear(point_data[cur_points], point_data[cur_points + 1],
-        //                            point);
-    // else
-    //     d = signed_distance_quad(texelFetch(point_data, cur_points).rg,
-    //                              texelFetch(point_data, (cur_points + 1)).rg,
-    //                              texelFetch(point_data, (cur_points + 2)).rg,
-    //                              point);
-        // d = signed_distance_quad(point_data[cur_points], point_data[cur_points + 1],
-        //                          point_data[cur_points + 2], point);
-    // if (seg_i++ == 8) {
-    // color = vec4(0.0, 0.0, 0.0, 1.0);
-    // color.r = abs(d.x) + .5;
-    // color.r = 1.0;
-    // if (d.r < 0.1 && d.g < 1.0)
-    //     color = vec4(1.0, 0.0, 0.0, 1.0);
-    // else
-    //     color = vec4(0.0, 0.0, 1.0, 1.0);
-    // }
-    // if (first)
-    //     color = vec4(d * -100.0, 1.0);
-        // color = vec4(1.0, 0.0, 0.0, 1.0);
-    // first = false;
-
     if ((s_color & RED) > 0u)
         add_segment_true_distance(IDX_CURR * 3 + IDX_RED, cur_npoints, cur_points, d);
     if ((s_color & GREEN) > 0u)
@@ -322,13 +213,10 @@ void add_segment(int prev_npoints, int prev_points, int cur_npoints, int cur_poi
                           next_npoints, next_points, point, d.z)) {
 
         vec2 pd = distance_to_pseudo_distance(cur_npoints, cur_points, d, point);
-        // if (s_color & RED)
         if ((s_color & RED) > 0u)
             add_segment_pseudo_distance(IDX_CURR * 3 + IDX_RED, pd);
-        // if (s_color & GREEN)
         if ((s_color & GREEN) > 0u)
             add_segment_pseudo_distance(IDX_CURR * 3 + IDX_GREEN, pd);
-        // if (s_color & BLUE)
         if ((s_color & BLUE) > 0u)
             add_segment_pseudo_distance(IDX_CURR * 3 + IDX_BLUE, pd);
     }

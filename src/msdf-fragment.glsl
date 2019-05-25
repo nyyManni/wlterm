@@ -87,7 +87,7 @@ void main() {
     
     // Exactly 0.5 causes a strange artifact
     vec2 p = ((coords + 0.4999) / scale) - translate;
-    p -= range / 2.0;
+    p.y -= range / 2.0;
 
     ws.maximums[0].r = -INFINITY;
     ws.maximums[1].r = -INFINITY;
@@ -101,11 +101,8 @@ void main() {
 
     for (int i = 0; i < (4 * 3); ++i) {
         ws.segments[i].mins[0].x = -INFINITY;
-        ws.segments[i].mins[0].y = 0.0;
         ws.segments[i].mins[1].x = -INFINITY;
-        ws.segments[i].mins[1].y = 0.0;
         ws.segments[i].min_true.x = -INFINITY;
-        ws.segments[i].min_true.y = 0.0;
     }
     int point_index = 0;
     int meta_index = 0;
@@ -133,7 +130,7 @@ void main() {
             cur_points += (int(npoints) - 1);
         }
 
-        for (uint _i = 0u; _i < nsegments - 2u && nsegments >= 2u; ++_i) {
+        for (uint _i = 0u; (_i < (nsegments - 2u)) && nsegments >= 2u; ++_i) {
             uint npoints = meta_at(meta_index + 2 * int(_i) + 1);
             prev_points += (int(npoints) - 1);
         }
@@ -146,8 +143,6 @@ void main() {
             add_segment(int(prev_npoints), prev_points, int(cur_npoints), cur_points,
                         int(s_npoints), point_index, cur_color, p);
 
-            // prev_points = cur_points;
-            // prev_npoints = cur_npoints;
             cur_points = point_index;
             cur_npoints = s_npoints;
             cur_color = s_color;
@@ -165,6 +160,7 @@ void main() {
 
     color = vec4(d / range + 0.5, 1.0);
     
+    // For testing
     // color = median(color.rgb) > 0.5 ? vec4(1.0, 1.0, 1.0, 1.0) : vec4(0.0, 0.0, 0.0, 1.0);
 }
 
@@ -411,9 +407,6 @@ vec3 get_pixel_distance(vec2 point) {
     vec3 outer_distance = get_distance(IDX_OUTER, point);
     float inner_d = median(inner_distance);
     float outer_d = median(outer_distance);
-    // color.r = inner_d;
-    // color.g = outer_d;
-    // color.a = 1.0;
 
     bool inner = inner_d >= 0.0 && abs(inner_d) <= abs(outer_d);
     bool outer = outer_d <= 0.0 && abs(outer_d) < abs(inner_d);

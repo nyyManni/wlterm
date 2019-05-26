@@ -89,7 +89,7 @@ bool less(vec2 a, vec2 b) {
 void main() {
     vec2 coords = gl_FragCoord.xy - offset;
     
-    vec2 p = ((coords + 0.5) / scale) - vec2(translate.x, -translate.y);
+    vec2 p = ((coords + 0.49) / scale) - vec2(translate.x, -translate.y);
     p.y  = (glyph_height / scale.y) - p.y;
 
     ws.maximums[0].r = -INFINITY;
@@ -164,7 +164,7 @@ void main() {
     color = vec4(d / range + 0.5, 1.0);
     
     // For testing
-    color = median(color.rgb) > 0.5 ? vec4(1.0, 1.0, 1.0, 1.0) : vec4(0.0, 0.0, 0.0, 1.0);
+    // color = median(color.rgb) > 0.5 ? vec4(1.0, 1.0, 1.0, 1.0) : vec4(0.0, 0.0, 0.0, 1.0);
 }
 
 void merge_segment(int s, int other) {

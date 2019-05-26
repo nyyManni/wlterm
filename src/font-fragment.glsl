@@ -25,5 +25,5 @@ void main() {
     float sigDist = median(s.r, s.g, s.b) - threshold;
     sigDist *= dot(msdfUnit, 0.5/fwidth(coords));
     float opacity = clamp(sigDist + 0.5, 0.0, 1.0);
-    color = mix(vec4(0.0, 0.0, 1.0, 1.0), text_color, opacity);
+    color = mix(vec4(0.0, 0.0, 0.0, 0.0), text_color, opacity);
 }

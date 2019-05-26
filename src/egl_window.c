@@ -32,7 +32,7 @@
     } while (0);
 
 /* double font_size = 8.5; */
-double font_size = 8.5 / 8.0;
+double font_size = 8.5 / 18.0;
 
 GLenum err;
 
@@ -412,7 +412,7 @@ void generate_msdf_atlas(const char *font_name, float scale, float range) {
 
     glViewport(0, 0, msdf_texture_size, msdf_texture_size);
 
-    glClearColor(1.0, 0.0, 0.0, 1.0);
+    glClearColor(0.0, 0.0, 0.0, 1.0);
     glClear(GL_COLOR_BUFFER_BIT);
 
     GLuint _vbo;

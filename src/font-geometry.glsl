@@ -34,7 +34,7 @@ void main() {
     vec2 glyph_texture_height = vec2(0.0, texelFetch(font_vertices, _offset + 3).r);
 
     vec4 bearing = vec4(texelFetch(font_vertices, _offset + 4).r,
-                        texelFetch(font_vertices, _offset + 5).r, 0.0, 0.0) * font_size;
+                        -texelFetch(font_vertices, _offset + 5).r, 0.0, 0.0) * font_size;
 
 
     vec4 glyph_width = vec4(texelFetch(font_vertices, _offset + 6).r, 0.0, 0.0, 0.0) * font_size;
@@ -51,28 +51,28 @@ void main() {
     _p = p + bearing + glyph_height - padding_x + padding_y;
     _p.x += skewness * (p.y - _p.y);
     gl_Position = projection * _p;
-    text_pos = text_offset;
+    text_pos = text_offset + glyph_texture_height;
     EmitVertex();
 
     // BR
     _p = p + bearing + glyph_height + glyph_width + padding_x + padding_y;
     _p.x += skewness * (p.y - _p.y);
     gl_Position = projection * _p;
-    text_pos = text_offset + glyph_texture_width;
+    text_pos = text_offset + glyph_texture_width + glyph_texture_height;
     EmitVertex();
 
     // TL
     _p = p + bearing - padding_x - padding_y;
     _p.x += skewness * (p.y - _p.y);
     gl_Position = projection * _p;
-    text_pos = text_offset + glyph_texture_height;
+    text_pos = text_offset;
     EmitVertex();
 
     // TR
     _p = p + bearing + glyph_width + padding_x - padding_y;
     _p.x += skewness * (p.y - _p.y);
     gl_Position = projection * _p;
-    text_pos = text_offset + glyph_texture_width + glyph_texture_height;
+    text_pos = text_offset + glyph_texture_width;
     EmitVertex();
 
     EndPrimitive();

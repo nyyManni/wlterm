@@ -32,7 +32,7 @@
     } while (0);
 
 /* double font_size = 8.5; */
-double font_size = 8.5;
+double font_size = 8.5 / 8.0;
 
 GLenum err;
 
@@ -273,7 +273,7 @@ void generate_msdf_atlas(const char *font_name, float scale, float range) {
     struct gl_glyph_atlas_item atlas_index[MSDF_PRELOAD_N];
     char *meta_ptr = metadata;
     char *point_ptr = point_data;
-    float offset_x = 4, offset_y = 4, y_increment = 0;
+    float offset_x = 1, offset_y = 1, y_increment = 0;
     for (size_t i = 0; i < MSDF_PRELOAD_N; ++i) {
         float glyph_width, glyph_height, buffer_width, buffer_height;
         float bearing_x, bearing_y, advance;
@@ -291,8 +291,8 @@ void generate_msdf_atlas(const char *font_name, float scale, float range) {
         point_ptr += point_sizes[i];
 
         if (offset_x + buffer_width > FONT_BUFFER_SIZE) {
-            offset_y += (y_increment + 4);
-            offset_x = 4;
+            offset_y += (y_increment + 1);
+            offset_x = 1;
             y_increment = 0;
         }
         y_increment = buffer_height > y_increment ? buffer_height : y_increment;
@@ -303,11 +303,11 @@ void generate_msdf_atlas(const char *font_name, float scale, float range) {
         atlas_index[i].size_y = buffer_height;
         atlas_index[i].bearing_x = bearing_x;
         atlas_index[i].bearing_y = bearing_y;
-        atlas_index[i].glyph_width = glyph_height;
+        atlas_index[i].glyph_width = glyph_width;
         atlas_index[i].glyph_height = glyph_height;
         f->horizontal_advances[i] = advance;
 
-        offset_x += buffer_width + 4;
+        offset_x += buffer_width + 1;
     }
 
     /* Allocate and fill the buffers on GPU. */
@@ -433,8 +433,6 @@ void generate_msdf_atlas(const char *font_name, float scale, float range) {
         GLfloat bounding_box[] = {0, 0, w, 0, 0, h, 0, h, w, 0, w, h};
         glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(bounding_box), bounding_box);
 
-        /* glUniform2f(g_msdf_translate_uniform, -atlas_index[i].bearing_x,  */
-        /*             -atlas_index[i].bearing_y * 0.5 + range / 2.0); */
         glUniform2f(g_msdf_translate_uniform, -g.bearing_x + range / 2.0, 
                     g.glyph_height - g.bearing_y + range / 2.0);
 
@@ -453,8 +451,6 @@ void generate_msdf_atlas(const char *font_name, float scale, float range) {
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
 
     active_font = f;
-    /* glActiveTexture(GL_TEXTURE0); */
-    /* glBindTexture(GL_TEXTURE_2D, g_msdf_atlas_texture); */
 }
 
 struct font *load_font(const char *font_name, int height) {

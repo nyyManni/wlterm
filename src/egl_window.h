@@ -166,6 +166,16 @@ struct gl_glyph {
     GLfloat strength;
 };
 struct gl_overlay_vertex {GLfloat x; GLfloat y; GLuint c;};
+struct gl_glyph_atlas_item {
+    GLfloat offset_x;
+    GLfloat offset_y;
+    GLfloat size_x;
+    GLfloat size_y;
+    GLfloat glyph_width;
+    GLfloat glyph_height;
+    GLfloat bearing_x;
+    GLfloat bearing_y;
+};
 
 void init_egl();
 void kill_egl();

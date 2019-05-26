@@ -20,9 +20,9 @@ precision mediump usamplerBuffer;
 layout (binding = 0) uniform usamplerBuffer metadata;
 layout (binding = 1) uniform samplerBuffer point_data;
 
-#define meta_at(i) texelFetch(metadata, int(meta_offset + i)).r
-#define point_at(i) vec2(texelFetch(point_data, point_offset + 2 * int(i)).r, \
-                         texelFetch(point_data, point_offset + 2 * int(i) + 1).r)
+#define meta_at(i) texelFetch(metadata, int(i)).r
+#define point_at(i) vec2(texelFetch(point_data, 2 * int(i)).r, \
+                         texelFetch(point_data, 2 * int(i) + 1).r)
 
 uniform vec2 offset;
 
@@ -31,6 +31,7 @@ uniform vec2 scale;
 uniform float range;
 uniform int meta_offset;
 uniform int point_offset;
+uniform float glyph_height;
 
 out vec4 color;
 
@@ -89,8 +90,11 @@ void main() {
     vec2 coords = gl_FragCoord.xy - offset;
     
     // Exactly 0.5 causes a strange artifact
-    vec2 p = ((coords + 0.4999) / scale) - translate;
-    p.y -= range / 2.0;
+    vec2 p = ((coords + 0.5) / scale) - vec2(translate.x, -translate.y);
+    p.y  = (glyph_height / scale.y) - p.y;
+    // p -= (range / 2.0);
+    // p.y -= range / 2.0;
+    // p.x -= range / 2.0;
 
     ws.maximums[0].r = -INFINITY;
     ws.maximums[1].r = -INFINITY;
@@ -107,8 +111,8 @@ void main() {
         ws.segments[i].mins[1].x = -INFINITY;
         ws.segments[i].min_true.x = -INFINITY;
     }
-    int point_index = 0;
-    int meta_index = 0;
+    int point_index = point_offset;
+    int meta_index = meta_offset;
     
 
     uint ncontours = meta_at(meta_index++);

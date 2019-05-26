@@ -130,16 +130,16 @@ struct window {
 };
 
 struct font {
-    GLuint texture;
-    GLuint vertex_texture;
-    GLuint vertex_buffer;
+    /* GLuint texture; */
+    /* GLuint vertex_texture; */
+    /* GLuint vertex_buffer; */
 
     GLuint msdf_glyph_uniform;
     GLuint msdf_glyph_texture;
     GLuint msdf_atlas_texture;
     GLuint msdf_framebuffer;
 
-    mat4 texture_projection;
+    /* mat4 texture_projection; */
 
     int texture_size;
 
@@ -171,10 +171,10 @@ struct gl_glyph_atlas_item {
     GLfloat offset_y;
     GLfloat size_x;
     GLfloat size_y;
-    GLfloat glyph_width;
-    GLfloat glyph_height;
     GLfloat bearing_x;
     GLfloat bearing_y;
+    GLfloat glyph_width;
+    GLfloat glyph_height;
 };
 
 void init_egl();

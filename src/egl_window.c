@@ -32,12 +32,13 @@
     } while (0);
 
 /* double font_size = 8.5; */
-double font_size = 8.5 / 18.0;
+/* double font_size = 8.5 / 18.0; */
+double font_size = 8.5 / 8.0;
 
 GLenum err;
 
 
-GLuint font_texture;
+/* GLuint font_texture; */
 GLuint g_msdf_shader;
 
 mat4 g_msdf_projection;
@@ -51,12 +52,13 @@ GLuint g_msdf_range_uniform;
 GLuint g_msdf_glyph_height_uniform;
 GLuint g_msdf_meta_offset_uniform;
 GLuint g_msdf_point_offset_uniform;
+
 GLuint g_msdf_atlas_texture;
 GLuint g_msdf_index_buffer;
 GLuint g_msdf_index_texture;
 GLuint g_msdf_framebuffer;
-GLuint g_msdf_glyph_uniform;
-GLuint g_msdf_glyph_texture;
+/* GLuint g_msdf_glyph_uniform; */
+/* GLuint g_msdf_glyph_texture; */
 
 
 GLuint g_debug_shader;
@@ -70,8 +72,6 @@ int parse_color(const char *color, vec3 ret) {
         memcpy(buf, &color[channel * 2], 2);
         ret[channel] = strtol(buf, NULL, 16) / 255.0;
     }
-
-
     return 1;
 };
 
@@ -210,8 +210,8 @@ void init_egl() {
     eglMakeCurrent(g_gl_display, EGL_NO_SURFACE, EGL_NO_SURFACE, g_root_ctx);
     eglSwapInterval(g_gl_display, 0);
 
-    g_msdf_shader =  create_program("src/msdf-vertex.glsl",
-                                    "src/msdf-fragment.glsl",
+    g_msdf_shader =  create_program("src/msdf_vertex.glsl",
+                                    "src/msdf_fragment.glsl",
                                     NULL);
     g_msdf_projection_uniform = glGetUniformLocation(g_msdf_shader, "projection");
     g_msdf_offset_uniform = glGetUniformLocation(g_msdf_shader, "offset");
@@ -246,6 +246,19 @@ void generate_msdf_atlas(const char *font_name, float scale, float range) {
     glEnable(GL_CULL_FACE);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    GLuint meta_buffer, point_buffer;
+    glGenBuffers(1, &meta_buffer);
+    glGenBuffers(1, &point_buffer);
+    glGenBuffers(1, &g_msdf_index_buffer);
+
+    GLuint meta_texture, point_texture;
+    glGenTextures(1, &meta_texture);
+    glGenTextures(1, &point_texture);
+
+    glGenTextures(1, &g_msdf_atlas_texture);
+    glGenFramebuffers(1, &g_msdf_framebuffer);
+
 
     struct font *f = malloc(sizeof (struct font));
 
@@ -311,11 +324,6 @@ void generate_msdf_atlas(const char *font_name, float scale, float range) {
     }
 
     /* Allocate and fill the buffers on GPU. */
-    GLuint meta_buffer, point_buffer;
-    glGenBuffers(1, &meta_buffer);
-    glGenBuffers(1, &point_buffer);
-    glGenBuffers(1, &g_msdf_index_buffer);
-
     glBindBuffer(GL_ARRAY_BUFFER, meta_buffer);
     glBufferData(GL_ARRAY_BUFFER, meta_size_sum, metadata, GL_STATIC_READ);
 
@@ -328,10 +336,6 @@ void generate_msdf_atlas(const char *font_name, float scale, float range) {
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 
     /* Link sampler textures to the buffers. */
-    GLuint meta_texture, point_texture;
-    glGenTextures(1, &meta_texture);
-    glGenTextures(1, &point_texture);
-
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_BUFFER, meta_texture);
     glTexBuffer(GL_TEXTURE_BUFFER, GL_R8UI, meta_buffer);
@@ -351,9 +355,6 @@ void generate_msdf_atlas(const char *font_name, float scale, float range) {
 
 
     /* Generate the atlas texture and bind it as the framebuffer. */
-    glGenTextures(1, &g_msdf_atlas_texture);
-    glGenFramebuffers(1, &g_msdf_framebuffer);
-
     glBindTexture(GL_TEXTURE_2D, g_msdf_atlas_texture);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -396,16 +397,13 @@ void generate_msdf_atlas(const char *font_name, float scale, float range) {
               -1.0, 1.0, msdf_projection);
 
     glUniformMatrix4fv(g_msdf_projection_uniform, 1, GL_FALSE, (GLfloat *) msdf_projection);
-    /* glUniform2f(g_msdf_offset_uniform, 0, 0); */
     glUniform2f(g_msdf_scale_uniform, scale, scale);
     glUniform1f(g_msdf_range_uniform, range);
     glUniform1i(g_msdf_meta_offset_uniform, 0);
     glUniform1i(g_msdf_point_offset_uniform, 0);
 
-
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, g_msdf_atlas_texture, 0);
     CHECK_ERROR
-
 
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
         printf("framebuffer incomplete: %x\n", glCheckFramebufferStatus(GL_FRAMEBUFFER));
@@ -441,7 +439,9 @@ void generate_msdf_atlas(const char *font_name, float scale, float range) {
         glUniform1i(g_msdf_point_offset_uniform, point_offset / (2 * sizeof(GLfloat)));
         glUniform1f(g_msdf_glyph_height_uniform, g.size_y);
 
-        glDrawArrays(GL_TRIANGLES, 0, 6);
+        /* Do not bother rendering control characters */
+        if (i > 31 && !(i > 126 && i < 160))
+            glDrawArrays(GL_TRIANGLES, 0, 6);
 
         meta_offset += meta_sizes[i];
         point_offset += point_sizes[i];

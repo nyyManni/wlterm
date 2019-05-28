@@ -15,6 +15,7 @@
 #include <wayland-egl.h>
 
 #include "msdf.h"
+/* #include <msdf_gl.h> */
 
 #include "egl_util.h"
 #include "egl_window.h"
@@ -37,6 +38,8 @@ double font_size = 8.5 / 8.0;
 
 GLenum err;
 
+/* msdf_gl_context_t msdf_ctx; */
+/* msdf_gl_font_t msdf_font; */
 
 /* GLuint font_texture; */
 GLuint g_msdf_shader;
@@ -240,17 +243,19 @@ void kill_egl() {
 void generate_msdf_atlas(const char *font_name, float scale, float range) {
 
     eglMakeCurrent(g_gl_display, EGL_NO_SURFACE, EGL_NO_SURFACE, g_root_ctx);
-    eglSwapInterval(g_gl_display, 0);
-    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    /* eglSwapInterval(g_gl_display, 0); */
+    /* glPixelStorei(GL_UNPACK_ALIGNMENT, 1); */
 
-    glEnable(GL_CULL_FACE);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    /* glEnable(GL_CULL_FACE); */
+    /* glEnable(GL_BLEND); */
+    /* glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); */
 
     GLuint meta_buffer, point_buffer;
     glGenBuffers(1, &meta_buffer);
     glGenBuffers(1, &point_buffer);
+
     glGenBuffers(1, &g_msdf_index_buffer);
+    glGenTextures(1, &g_msdf_index_texture);
 
     GLuint meta_texture, point_texture;
     glGenTextures(1, &meta_texture);
@@ -347,7 +352,6 @@ void generate_msdf_atlas(const char *font_name, float scale, float range) {
     glBindTexture(GL_TEXTURE_BUFFER, 0);
 
     glActiveTexture(GL_TEXTURE2);
-    glGenTextures(1, &g_msdf_index_texture);
     glBindTexture(GL_TEXTURE_BUFFER, g_msdf_index_texture);
     glTexBuffer(GL_TEXTURE_BUFFER, GL_R32F, g_msdf_index_buffer);
 
@@ -454,6 +458,12 @@ void generate_msdf_atlas(const char *font_name, float scale, float range) {
 }
 
 struct font *load_font(const char *font_name, int height) {
+
+    /* eglMakeCurrent(g_gl_display, EGL_NO_SURFACE, EGL_NO_SURFACE, g_root_ctx); */
+    /* msdf_ctx = msdf_gl_create_context(); */
+
+    /* msdf_gl_load_font(msdf_gl_context_t ctx, const char *font_name, double range, double scale, size_t texture_size) */
+
     generate_msdf_atlas(font_name, 2.0, 4.0);
     return (struct font *)1;
 }

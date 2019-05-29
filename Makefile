@@ -14,7 +14,7 @@ src/msdf_gl.o: src/msdf_gl.c src/_msdf_shaders.h
 	gcc -Isrc -g -I/usr/include/freetype2 -O3 -Wall -fPIC -DPIC -c $< -o $@ -Isrc
 
 # Generate a C-header containing char arrays of the shader files.
-src/_msdf_shaders.h: src/msdf_vertex.glsl src/msdf_fragment.glsl
+src/_msdf_shaders.h: src/msdf_vertex.glsl src/msdf_fragment.glsl src/font_vertex.glsl src/font_geometry.glsl src/font_fragment.glsl
 	echo '#ifndef _MSDF_SHADERS_H\n#define _MSDF_SHADERS_H' >$@
 	for f in $^; do fname=$${f##*/}; sed -e '1 i\\nconst char * _'$${fname%%.glsl}' =' -e 's/\\/\\\\/' -e 's/^\(.*\)$$/"\1\\n"/' -e '$$ a;' $$f >>$@; done
 	echo '#endif /* _MSDF_SHADERS_H */' >>$@

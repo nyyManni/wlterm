@@ -27,10 +27,33 @@
 extern "C" {
 #endif
 
+struct _msdf_gl_context {
+    GLuint gen_shader;
+
+    GLuint _projection_uniform;
+    GLuint _texture_offset_uniform;
+    GLuint _translate_uniform;
+    GLuint _scale_uniform;
+    GLuint _range_uniform;
+    GLuint _glyph_height_uniform;
+
+    GLuint _meta_offset_uniform;
+    GLuint _point_offset_uniform;
+
+    GLuint metadata_uniform;
+    GLuint point_data_uniform;
+
+    GLuint render_shader;
+
+    GLuint window_projection_uniform;
+    GLuint _font_projection_uniform;
+    GLuint _font_vertex_uniform;
+    GLuint _font_texture_uniform;
+    GLuint _padding_uniform;
+    GLuint _offset_uniform;
+};
 typedef struct _msdf_gl_context *msdf_gl_context_t;
 
-/* typedef GLfloat vec4[4]; */
-/* typedef vec4 mat4[4]; */
 
 /**
  * Compile shaders and configure uniforms.
@@ -55,8 +78,6 @@ struct _msdf_gl_font {
     float horizontal_advances[256];
 
     GLfloat projection[4][4];
-
-    msdf_font_handle _msdf_font;
 
     /**
      * 2D RGBA atlas texture containing all MSDF-glyph bitmaps.
@@ -94,6 +115,9 @@ struct _msdf_gl_font {
     GLuint _point_input_buffer;
     GLuint _meta_input_texture;
     GLuint _point_input_texture;
+
+    msdf_font_handle _msdf_font;
+
 };
 typedef struct _msdf_gl_font *msdf_gl_font_t;
 

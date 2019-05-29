@@ -61,27 +61,27 @@ struct frame {
 
     mat4 projection;
 
-    GLuint text_shader;
+    /* GLuint text_shader; */
     GLuint bg_shader;
     GLuint overlay_shader;
 
     struct window *root_window;
 
     GLuint projection_uniform;
-    GLuint font_projection_uniform;
-    GLuint font_texture_uniform;
-    GLuint font_vertex_uniform;
-    GLuint font_padding_uniform;
+    /* GLuint font_projection_uniform; */
+    /* GLuint font_texture_uniform; */
+    /* GLuint font_vertex_uniform; */
+    /* GLuint font_padding_uniform; */
     
-    GLuint msdf_projection_uniform;
-    GLuint msdf_vertex_uniform;
+    /* GLuint msdf_projection_uniform; */
+    /* GLuint msdf_vertex_uniform; */
 
     GLuint overlay_projection_uniform;
     GLuint overlay_offset_uniform;
 
     GLuint bg_projection_uniform;
     GLuint bg_accent_color_uniform;
-    GLuint offset_uniform;
+    /* GLuint offset_uniform; */
 
     bool has_minibuffer_p;
     int minibuffer_height;
@@ -134,20 +134,20 @@ struct font {
     /* GLuint vertex_texture; */
     /* GLuint vertex_buffer; */
 
-    GLuint msdf_glyph_uniform;
-    GLuint msdf_glyph_texture;
-    GLuint msdf_atlas_texture;
-    GLuint msdf_framebuffer;
+    /* GLuint msdf_glyph_uniform; */
+    /* GLuint msdf_glyph_texture; */
+    /* GLuint msdf_atlas_texture; */
+    /* GLuint msdf_framebuffer; */
 
     /* mat4 texture_projection; */
 
-    int texture_size;
+    /* int texture_size; */
 
-    float vertical_advance;
+    /* float vertical_advance; */
 
-    float horizontal_advances[254];
+    /* float horizontal_advances[254]; */
     
-    msdf_font_handle msdf_font;
+    /* msdf_font_handle msdf_font; */
 
 };
 

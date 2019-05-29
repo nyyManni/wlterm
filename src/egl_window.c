@@ -34,12 +34,13 @@
 
 /* double font_size = 8.5; */
 /* double font_size = 8.5 / 18.0; */
-double font_size = 8.5 / 8.0;
+double font_size = 8.5 / 18.0;
 
 GLenum err;
 
 msdf_gl_context_t msdf_ctx;
 msdf_gl_font_t active_font;
+
 
 
 /* GLuint font_texture; */
@@ -199,7 +200,7 @@ void init_egl() {
     eglGetConfigs(g_gl_display, NULL, 0, &count);
     configs = calloc(count, sizeof *configs);
     eglChooseConfig(g_gl_display, config_attribs, configs, count, &n);
-    eglSwapInterval(g_gl_display, 0);
+    /* eglSwapInterval(g_gl_display, 0); */
 
     for (i = 0; i < n; i++) {
         eglGetConfigAttrib(g_gl_display, configs[i], EGL_BUFFER_SIZE, &size);
@@ -465,7 +466,7 @@ struct font *load_font(const char *font_name, int height) {
     msdf_ctx = msdf_gl_create_context();
 
     active_font = msdf_gl_load_font(msdf_ctx, font_name, 4.0, 2.0, FONT_BUFFER_SIZE);
-    fprintf(stderr, "%.f\n", active_font->_msdf_font->underline_thickness);
+    /* fprintf(stderr, "%.f\n", active_font->_msdf_font->underline_thickness); */
     /* return NULL; */
 
     msdf_gl_generate_ascii(active_font);
@@ -546,14 +547,15 @@ struct frame *frame_create() {
     wl_surface_commit(f->surface);
 
     eglMakeCurrent(g_gl_display, f->gl_surface, f->gl_surface, f->gl_ctx);
-    eglSwapInterval(g_gl_display, 0);
+    /* eglSwapInterval(g_gl_display, 0); */
 
     f->bg_shader = create_program("src/bg-vertex.glsl",
                                   "src/bg-fragment.glsl",
                                   NULL);
-    f->text_shader = create_program("src/font-vertex.glsl",
-                                    "src/font-fragment.glsl",
-                                    "src/font-geometry.glsl");
+    /* f->text_shader = create_program("src/font_vertex.glsl", */
+    /*                                 "src/font_fragment.glsl", */
+    /*                                 "src/font_geometry.glsl"); */
+    
     f->overlay_shader = create_program("src/overlay-vertex.glsl",
                                        "src/overlay-fragment.glsl",
                                        "src/overlay-geometry.glsl");
@@ -569,14 +571,16 @@ struct frame *frame_create() {
     glBufferData(GL_ARRAY_BUFFER, MAX_GLYPHS_PER_DRAW * sizeof(struct gl_glyph), 0, GL_STATIC_DRAW);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 
-    f->projection_uniform = glGetUniformLocation(f->text_shader, "projection");
-    f->font_projection_uniform = glGetUniformLocation(f->text_shader, "font_projection");
-    f->font_vertex_uniform = glGetUniformLocation(f->text_shader, "font_vertices");
-    f->font_texture_uniform = glGetUniformLocation(f->text_shader, "font_texure");
-    f->font_padding_uniform = glGetUniformLocation(f->text_shader, "padding");
-    f->offset_uniform = glGetUniformLocation(f->text_shader, "offset");
-    /* glUniform1i(f->font_texture_uniform, 0); */
-    /* glUniform1i(f->font_vertex_uniform, 1); */
+    
+
+    active_font->context->window_projection_uniform = glGetUniformLocation(active_font->context->render_shader, "projection");
+    active_font->context->_font_projection_uniform = glGetUniformLocation(active_font->context->render_shader, "font_projection");
+    active_font->context->_font_vertex_uniform = glGetUniformLocation(active_font->context->render_shader, "font_vertices");
+    active_font->context->_font_texture_uniform = glGetUniformLocation(active_font->context->render_shader, "font_texure");
+    active_font->context->_padding_uniform = glGetUniformLocation(active_font->context->render_shader, "padding");
+    active_font->context->_offset_uniform = glGetUniformLocation(active_font->context->render_shader, "offset");
+    glUniform1i(active_font->context->_font_texture_uniform, 0);
+    glUniform1i(active_font->context->_font_vertex_uniform, 1);
 
     f->overlay_projection_uniform = glGetUniformLocation(f->overlay_shader, "projection");
     f->overlay_offset_uniform = glGetUniformLocation(f->overlay_shader, "offset");
@@ -752,6 +756,7 @@ void window_render(struct window *w) {
     /* glBindTexture(GL_TEXTURE_BUFFER, font->vertex_texture); */
     glBindTexture(GL_TEXTURE_BUFFER, active_font->index_texture);
 
+
     glBindBuffer(GL_ARRAY_BUFFER, w->text_area_glyphs);
 
     glEnableVertexAttribArray(0);
@@ -789,14 +794,14 @@ void window_render(struct window *w) {
                            sizeof(struct gl_glyph),
                           (void *)offsetof(struct gl_glyph, strength));
 
-    glUseProgram(w->frame->text_shader);
+    glUseProgram(active_font->context->render_shader);
     glUniformMatrix4fv(w->frame->projection_uniform, 1, GL_FALSE, (GLfloat *) w->projection);
     /* glUniformMatrix4fv(w->frame->font_projection_uniform, 1, GL_FALSE, (GLfloat *) font->texture_projection); */
-    glUniformMatrix4fv(w->frame->font_projection_uniform, 1, GL_FALSE, (GLfloat *) active_font->projection);
-    glUniform1f(w->frame->font_padding_uniform, 2.0);
-    glUniform2f(w->frame->offset_uniform, w->position[1] + w->linum_width, w->position[0]);
-    glUniform1i(w->frame->font_texture_uniform, 0);
-    glUniform1i(w->frame->font_vertex_uniform, 1);
+    glUniformMatrix4fv(active_font->context->_font_projection_uniform, 1, GL_FALSE, (GLfloat *) active_font->projection);
+    glUniform1f(active_font->context->_padding_uniform, 2.0);
+    glUniform2f(active_font->context->_offset_uniform, w->position[1] + w->linum_width, w->position[0]);
+    glUniform1i(active_font->context->_font_texture_uniform, 0);
+    glUniform1i(active_font->context->_font_vertex_uniform, 2);
 
     /* Draw buffer text. */
     double line_h = active_font->vertical_advance * font_size;
@@ -812,7 +817,7 @@ void window_render(struct window *w) {
     }
 
     set_region(w->frame, w->x, w->y, w->linum_width, w->height - modeline_h);
-    glUniform2f(w->frame->offset_uniform, 0.0, w->position[0]);
+    glUniform2f(active_font->context->_offset_uniform, 0.0, w->position[0]);
     char buf[36];
 
     /* Draw line numbers */
@@ -873,7 +878,7 @@ void window_render(struct window *w) {
     glActiveTexture(GL_TEXTURE0);
     /* glBindTexture(GL_TEXTURE_2D, active_font->msdf_atlas_texture); */
     /* glBindTexture(GL_TEXTURE_2D, g_msdf_atlas_texture); */
-    /* glBindTexture(GL_TEXTURE_2D, active_font->texture); */
+    glBindTexture(GL_TEXTURE_2D, active_font->index_texture);
 
 
     glUseProgram(g_debug_shader);
@@ -904,33 +909,34 @@ void window_render(struct window *w) {
     glBufferData(GL_ARRAY_BUFFER, 24 * sizeof(GLfloat), (GLfloat *)rect, GL_DYNAMIC_DRAW);
 
     glDrawArrays(GL_TRIANGLES, 0, 6);
-    /* GLfloat rect2[6][4] = { */
-    /*     /\* {0, 0, -2, -2}, *\/ */
-    /*     /\* {0, 1, -2, 2}, *\/ */
-    /*     /\* {1, 0, 2, 0}, *\/ */
+    GLfloat rect2[6][4] = {
+        /* {0, 0, -2, -2}, */
+        /* {0, 1, -2, 2}, */
+        /* {1, 0, 2, 0}, */
 
-    /*     /\* {0, 1, -2, 2}, *\/ */
-    /*     /\* {1, 0, 2, -2}, *\/ */
-    /*     /\* {1, 1, 2, 2} *\/ */
-    /*     {0, -1, 0, 1}, */
-    /*     {0, 0, 0, 0}, */
-    /*     {1, -1, 1, 1}, */
+        /* {0, 1, -2, 2}, */
+        /* {1, 0, 2, -2}, */
+        /* {1, 1, 2, 2} */
+        {0, -1, 0, 1},
+        {0, 0, 0, 0},
+        {1, -1, 1, 1},
 
-    /*     {0, 0, 0, 0}, */
-    /*     {1, -1, 1, 1}, */
-    /*     {1, 0, 1, 0} */
-    /* }; */
-    /* glBindTexture(GL_TEXTURE_2D, g_msdf_atlas_texture); */
+        {0, 0, 0, 0},
+        {1, -1, 1, 1},
+        {1, 0, 1, 0}
+    };
+    glActiveTexture(GL_TEXTURE2);
+    glBindTexture(GL_TEXTURE_2D, active_font->index_texture);
 
-    /* glBufferData(GL_ARRAY_BUFFER, 24 * sizeof(GLfloat), (GLfloat *)rect2, GL_DYNAMIC_DRAW); */
+    glBufferData(GL_ARRAY_BUFFER, 24 * sizeof(GLfloat), (GLfloat *)rect2, GL_DYNAMIC_DRAW);
 
-    /* glDrawArrays(GL_TRIANGLES, 0, 6); */
+    glDrawArrays(GL_TRIANGLES, 0, 6);
 }
 
 void frame_render(struct frame *f) {
 
     eglMakeCurrent(g_gl_display, f->gl_surface, f->gl_surface, f->gl_ctx);
-    eglSwapInterval(g_gl_display, 0);
+    /* eglSwapInterval(g_gl_display, 0); */
 
     glViewport(0, 0, f->width * f->scale, f->height * f->scale);
     glEnable(GL_BLEND);

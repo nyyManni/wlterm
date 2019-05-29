@@ -29,8 +29,8 @@ extern "C" {
 
 typedef struct _msdf_gl_context *msdf_gl_context_t;
 
-typedef GLfloat vec4[4];
-typedef vec4 mat4[4];
+/* typedef GLfloat vec4[4]; */
+/* typedef vec4 mat4[4]; */
 
 /**
  * Compile shaders and configure uniforms.
@@ -44,17 +44,19 @@ msdf_gl_context_t msdf_gl_create_context();
  */
 void msdf_gl_destroy_context(msdf_gl_context_t ctx);
 
-typedef struct _msdf_gl_font {
+struct _msdf_gl_font {
     char *font_name;
 
     double scale;
     double range;
     size_t texture_size;
-    
+
     double vertical_advance;
-    double *horizontal_advances;
-    
-    mat4 projection;
+    float horizontal_advances[256];
+
+    GLfloat projection[4][4];
+
+    msdf_font_handle _msdf_font;
 
     /**
      * 2D RGBA atlas texture containing all MSDF-glyph bitmaps.
@@ -82,20 +84,18 @@ typedef struct _msdf_gl_font {
     /**
      * The location in the atlas where the next bitmap would be rendered.
      */
-    size_t __offset_y;
-    size_t __offset_x;
+    size_t _offset_y;
+    size_t _offset_x;
 
     /**
      * Texture buffer objects for serialized FreeType data input.
      */
-    GLuint __meta_input_buffer;
-    GLuint __point_input_buffer;
-    GLuint __meta_input_texture;
-    GLuint __point_input_texture;
-
-    msdf_font_handle __msdf_font;
-
-} * msdf_gl_font_t;
+    GLuint _meta_input_buffer;
+    GLuint _point_input_buffer;
+    GLuint _meta_input_texture;
+    GLuint _point_input_texture;
+};
+typedef struct _msdf_gl_font *msdf_gl_font_t;
 
 /**
  * Load font from a font file and generate textures and buffers for it.
@@ -106,13 +106,13 @@ msdf_gl_font_t msdf_gl_load_font(msdf_gl_context_t ctx, const char *font_name,
 /**
  * Release resources allocated by `msdf_gl_load_font`.
  */
-void msdf_gl_destroy_font(msdf_gl_font_t font);
+/* void msdf_gl_destroy_font(msdf_gl_font_t font); */
 
 /**
  * Render a single glyph onto the MSFD atlas. Intented use case is to generate
  * the bitmaps on-demand as the characters are appearing.
  */
-int msdf_gl_render_glyph(msdf_gl_font_t font, int32_t char_code);
+/* int msdf_gl_render_glyph(msdf_gl_font_t font, int32_t char_code); */
 
 /**
  * Render a range of glyphs onto the MSFD atlas. The range is inclusive. Intended
@@ -123,7 +123,7 @@ int msdf_gl_render_glyphs(msdf_gl_font_t font, int32_t start, int32_t end);
 /**
  * Render arbitrary character codes in bulk.
  */
-int msdf_gl_render_glyph_list(msdf_gl_font_t font, int32_t *list, size_t n);
+/* int msdf_gl_render_glyph_list(msdf_gl_font_t font, int32_t *list, size_t n); */
 
 /**
  * Shortcuts for common needs.

@@ -14,8 +14,8 @@
 #include <wayland-client.h>
 #include <wayland-egl.h>
 
-#include "msdf.h"
-/* #include <msdf_gl.h> */
+/* #include "msdf.h" */
+#include <msdf_gl.h>
 
 #include "egl_util.h"
 #include "egl_window.h"
@@ -38,34 +38,36 @@ double font_size = 8.5 / 8.0;
 
 GLenum err;
 
-/* msdf_gl_context_t msdf_ctx; */
-/* msdf_gl_font_t msdf_font; */
+msdf_gl_context_t msdf_ctx;
+msdf_gl_font_t active_font;
+
 
 /* GLuint font_texture; */
-GLuint g_msdf_shader;
+/* GLuint g_msdf_shader; */
 
-mat4 g_msdf_projection;
-GLuint g_msdf_projection_uniform;
-GLuint g_msdf_offset_uniform;
-GLuint g_msdf_metadata_uniform;
-GLuint g_msdf_point_data_uniform;
-GLuint g_msdf_translate_uniform;
-GLuint g_msdf_scale_uniform;
-GLuint g_msdf_range_uniform;
-GLuint g_msdf_glyph_height_uniform;
-GLuint g_msdf_meta_offset_uniform;
-GLuint g_msdf_point_offset_uniform;
+/* mat4 g_msdf_projection; */
+/* GLuint g_msdf_projection_uniform; */
+/* GLuint g_msdf_offset_uniform; */
+/* GLuint g_msdf_metadata_uniform; */
+/* GLuint g_msdf_point_data_uniform; */
+/* GLuint g_msdf_translate_uniform; */
+/* GLuint g_msdf_scale_uniform; */
+/* GLuint g_msdf_range_uniform; */
+/* GLuint g_msdf_glyph_height_uniform; */
+/* GLuint g_msdf_meta_offset_uniform; */
+/* GLuint g_msdf_point_offset_uniform; */
 
-GLuint g_msdf_atlas_texture;
-GLuint g_msdf_index_buffer;
-GLuint g_msdf_index_texture;
-GLuint g_msdf_framebuffer;
+/* GLuint g_msdf_atlas_texture; */
+/* GLuint g_msdf_index_buffer; */
+/* GLuint g_msdf_index_texture; */
+/* G Luint g_msdf_framebuffer; */
+
 /* GLuint g_msdf_glyph_uniform; */
 /* GLuint g_msdf_glyph_texture; */
 
 
 GLuint g_debug_shader;
-struct font *active_font;
+/* struct font *active_font; */
 
 
 int parse_color(const char *color, vec3 ret) {
@@ -213,19 +215,19 @@ void init_egl() {
     eglMakeCurrent(g_gl_display, EGL_NO_SURFACE, EGL_NO_SURFACE, g_root_ctx);
     eglSwapInterval(g_gl_display, 0);
 
-    g_msdf_shader =  create_program("src/msdf_vertex.glsl",
-                                    "src/msdf_fragment.glsl",
-                                    NULL);
-    g_msdf_projection_uniform = glGetUniformLocation(g_msdf_shader, "projection");
-    g_msdf_offset_uniform = glGetUniformLocation(g_msdf_shader, "offset");
-    g_msdf_metadata_uniform = glGetUniformLocation(g_msdf_shader, "metadata");
-    g_msdf_point_data_uniform = glGetUniformLocation(g_msdf_shader, "point_data");
-    g_msdf_translate_uniform = glGetUniformLocation(g_msdf_shader, "translate");
-    g_msdf_scale_uniform = glGetUniformLocation(g_msdf_shader, "scale");
-    g_msdf_range_uniform = glGetUniformLocation(g_msdf_shader, "range");
-    g_msdf_glyph_height_uniform = glGetUniformLocation(g_msdf_shader, "glyph_height");
-    g_msdf_meta_offset_uniform = glGetUniformLocation(g_msdf_shader, "meta_offset");
-    g_msdf_point_offset_uniform = glGetUniformLocation(g_msdf_shader, "point_offset");
+    /* g_msdf_shader =  create_program("src/msdf_vertex.glsl", */
+    /*                                 "src/msdf_fragment.glsl", */
+    /*                                 NULL); */
+    /* g_msdf_projection_uniform = glGetUniformLocation(g_msdf_shader, "projection"); */
+    /* g_msdf_offset_uniform = glGetUniformLocation(g_msdf_shader, "offset"); */
+    /* g_msdf_metadata_uniform = glGetUniformLocation(g_msdf_shader, "metadata"); */
+    /* g_msdf_point_data_uniform = glGetUniformLocation(g_msdf_shader, "point_data"); */
+    /* g_msdf_translate_uniform = glGetUniformLocation(g_msdf_shader, "translate"); */
+    /* g_msdf_scale_uniform = glGetUniformLocation(g_msdf_shader, "scale"); */
+    /* g_msdf_range_uniform = glGetUniformLocation(g_msdf_shader, "range"); */
+    /* g_msdf_glyph_height_uniform = glGetUniformLocation(g_msdf_shader, "glyph_height"); */
+    /* g_msdf_meta_offset_uniform = glGetUniformLocation(g_msdf_shader, "meta_offset"); */
+    /* g_msdf_point_offset_uniform = glGetUniformLocation(g_msdf_shader, "point_offset"); */
 
     g_debug_shader = create_program("src/texdebug-vertex.glsl",
                                     "src/texdebug-fragment.glsl",
@@ -240,231 +242,235 @@ void kill_egl() {
     eglReleaseThread();
 }
 
-void generate_msdf_atlas(const char *font_name, float scale, float range) {
+/* void generate_msdf_atlas(const char *font_name, float scale, float range) { */
 
-    eglMakeCurrent(g_gl_display, EGL_NO_SURFACE, EGL_NO_SURFACE, g_root_ctx);
-    /* eglSwapInterval(g_gl_display, 0); */
-    /* glPixelStorei(GL_UNPACK_ALIGNMENT, 1); */
+/*     eglMakeCurrent(g_gl_display, EGL_NO_SURFACE, EGL_NO_SURFACE, g_root_ctx); */
+/*     /\* eglSwapInterval(g_gl_display, 0); *\/ */
+/*     /\* glPixelStorei(GL_UNPACK_ALIGNMENT, 1); *\/ */
 
-    /* glEnable(GL_CULL_FACE); */
-    /* glEnable(GL_BLEND); */
-    /* glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); */
+/*     /\* glEnable(GL_CULL_FACE); *\/ */
+/*     /\* glEnable(GL_BLEND); *\/ */
+/*     /\* glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); *\/ */
 
-    GLuint meta_buffer, point_buffer;
-    glGenBuffers(1, &meta_buffer);
-    glGenBuffers(1, &point_buffer);
+/*     GLuint meta_buffer, point_buffer; */
+/*     glGenBuffers(1, &meta_buffer); */
+/*     glGenBuffers(1, &point_buffer); */
 
-    glGenBuffers(1, &g_msdf_index_buffer);
-    glGenTextures(1, &g_msdf_index_texture);
+/*     glGenBuffers(1, &g_msdf_index_buffer); */
+/*     glGenTextures(1, &g_msdf_index_texture); */
 
-    GLuint meta_texture, point_texture;
-    glGenTextures(1, &meta_texture);
-    glGenTextures(1, &point_texture);
+/*     GLuint meta_texture, point_texture; */
+/*     glGenTextures(1, &meta_texture); */
+/*     glGenTextures(1, &point_texture); */
 
-    glGenTextures(1, &g_msdf_atlas_texture);
-    glGenFramebuffers(1, &g_msdf_framebuffer);
-
-
-    struct font *f = malloc(sizeof (struct font));
-
-    msdf_font_handle msdf_font = msdf_load_font(font_name);
-    f->msdf_font = msdf_font;
-
-    /* Calculate the amount of memory needed on the GPU.*/
-    size_t meta_sizes[MSDF_PRELOAD_N];
-    size_t point_sizes[MSDF_PRELOAD_N];
-    size_t meta_size_sum = 0;
-    size_t point_size_sum = 0;
-    for (size_t i = 0; i < MSDF_PRELOAD_N; ++i) {
-        msdf_glyph_buffer_size(msdf_font, i, &meta_sizes[i], &point_sizes[i]);
-        meta_size_sum += meta_sizes[i];
-        point_size_sum += point_sizes[i];
-    }
-
-    /* Allocate the calculated amount. */
-    void *point_data = malloc(point_size_sum);
-    void *metadata = malloc(meta_size_sum);
+/*     glGenTextures(1, &g_msdf_atlas_texture); */
+/*     glGenFramebuffers(1, &g_msdf_framebuffer); */
 
 
-    /* Serialize the glyphs into RAM. */
-    f->vertical_advance = msdf_font->height;
-    struct gl_glyph_atlas_item atlas_index[MSDF_PRELOAD_N];
-    char *meta_ptr = metadata;
-    char *point_ptr = point_data;
-    float offset_x = 1, offset_y = 1, y_increment = 0;
-    for (size_t i = 0; i < MSDF_PRELOAD_N; ++i) {
-        float glyph_width, glyph_height, buffer_width, buffer_height;
-        float bearing_x, bearing_y, advance;
-        msdf_serialize_glyph(msdf_font, i,
-                             meta_ptr,
-                             point_ptr,
-                             &glyph_width, &glyph_height,
-                             &bearing_x, &bearing_y,
-                             &advance);
+/*     struct font *f = malloc(sizeof (struct font)); */
 
-        buffer_width = (glyph_width + range) * scale;
-        buffer_height = (glyph_height + range) * scale;
+/*     msdf_font_handle msdf_font = msdf_load_font(font_name); */
+/*     f->msdf_font = msdf_font; */
 
-        meta_ptr += meta_sizes[i];
-        point_ptr += point_sizes[i];
+/*     /\* Calculate the amount of memory needed on the GPU.*\/ */
+/*     size_t meta_sizes[MSDF_PRELOAD_N]; */
+/*     size_t point_sizes[MSDF_PRELOAD_N]; */
+/*     size_t meta_size_sum = 0; */
+/*     size_t point_size_sum = 0; */
+/*     for (size_t i = 0; i < MSDF_PRELOAD_N; ++i) { */
+/*         msdf_glyph_buffer_size(msdf_font, i, &meta_sizes[i], &point_sizes[i]); */
+/*         meta_size_sum += meta_sizes[i]; */
+/*         point_size_sum += point_sizes[i]; */
+/*     } */
 
-        if (offset_x + buffer_width > FONT_BUFFER_SIZE) {
-            offset_y += (y_increment + 1);
-            offset_x = 1;
-            y_increment = 0;
-        }
-        y_increment = buffer_height > y_increment ? buffer_height : y_increment;
-
-        atlas_index[i].offset_x = offset_x;
-        atlas_index[i].offset_y = offset_y;
-        atlas_index[i].size_x = buffer_width;
-        atlas_index[i].size_y = buffer_height;
-        atlas_index[i].bearing_x = bearing_x;
-        atlas_index[i].bearing_y = bearing_y;
-        atlas_index[i].glyph_width = glyph_width;
-        atlas_index[i].glyph_height = glyph_height;
-        f->horizontal_advances[i] = advance;
-
-        offset_x += buffer_width + 1;
-    }
-
-    /* Allocate and fill the buffers on GPU. */
-    glBindBuffer(GL_ARRAY_BUFFER, meta_buffer);
-    glBufferData(GL_ARRAY_BUFFER, meta_size_sum, metadata, GL_STATIC_READ);
-
-    glBindBuffer(GL_ARRAY_BUFFER, point_buffer);
-    glBufferData(GL_ARRAY_BUFFER, point_size_sum, point_data, GL_STATIC_READ);
-
-    glBindBuffer(GL_ARRAY_BUFFER, g_msdf_index_buffer);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(atlas_index), atlas_index, GL_STATIC_READ);
-
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-    /* Link sampler textures to the buffers. */
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_BUFFER, meta_texture);
-    glTexBuffer(GL_TEXTURE_BUFFER, GL_R8UI, meta_buffer);
-    glBindTexture(GL_TEXTURE_BUFFER, 0);
-
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_BUFFER, point_texture);
-    glTexBuffer(GL_TEXTURE_BUFFER, GL_R32F, point_buffer);
-    glBindTexture(GL_TEXTURE_BUFFER, 0);
-
-    glActiveTexture(GL_TEXTURE2);
-    glBindTexture(GL_TEXTURE_BUFFER, g_msdf_index_texture);
-    glTexBuffer(GL_TEXTURE_BUFFER, GL_R32F, g_msdf_index_buffer);
-
-    glActiveTexture(GL_TEXTURE0);
+/*     /\* Allocate the calculated amount. *\/ */
+/*     void *point_data = malloc(point_size_sum); */
+/*     void *metadata = malloc(meta_size_sum); */
 
 
-    /* Generate the atlas texture and bind it as the framebuffer. */
-    glBindTexture(GL_TEXTURE_2D, g_msdf_atlas_texture);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+/*     /\* Serialize the glyphs into RAM. *\/ */
+/*     f->vertical_advance = msdf_font->height; */
+/*     struct gl_glyph_atlas_item atlas_index[MSDF_PRELOAD_N]; */
+/*     char *meta_ptr = metadata; */
+/*     char *point_ptr = point_data; */
+/*     float offset_x = 1, offset_y = 1, y_increment = 0; */
+/*     for (size_t i = 0; i < MSDF_PRELOAD_N; ++i) { */
+/*         float glyph_width, glyph_height, buffer_width, buffer_height; */
+/*         float bearing_x, bearing_y, advance; */
+/*         msdf_serialize_glyph(msdf_font, i, */
+/*                              meta_ptr, */
+/*                              point_ptr, */
+/*                              &glyph_width, &glyph_height, */
+/*                              &bearing_x, &bearing_y, */
+/*                              &advance); */
+
+/*         buffer_width = (glyph_width + range) * scale; */
+/*         buffer_height = (glyph_height + range) * scale; */
+
+/*         meta_ptr += meta_sizes[i]; */
+/*         point_ptr += point_sizes[i]; */
+
+/*         if (offset_x + buffer_width > FONT_BUFFER_SIZE) { */
+/*             offset_y += (y_increment + 1); */
+/*             offset_x = 1; */
+/*             y_increment = 0; */
+/*         } */
+/*         y_increment = buffer_height > y_increment ? buffer_height : y_increment; */
+
+/*         atlas_index[i].offset_x = offset_x; */
+/*         atlas_index[i].offset_y = offset_y; */
+/*         atlas_index[i].size_x = buffer_width; */
+/*         atlas_index[i].size_y = buffer_height; */
+/*         atlas_index[i].bearing_x = bearing_x; */
+/*         atlas_index[i].bearing_y = bearing_y; */
+/*         atlas_index[i].glyph_width = glyph_width; */
+/*         atlas_index[i].glyph_height = glyph_height; */
+/*         f->horizontal_advances[i] = advance; */
+
+/*         offset_x += buffer_width + 1; */
+/*     } */
+
+/*     /\* Allocate and fill the buffers on GPU. *\/ */
+/*     glBindBuffer(GL_ARRAY_BUFFER, meta_buffer); */
+/*     glBufferData(GL_ARRAY_BUFFER, meta_size_sum, metadata, GL_STATIC_READ); */
+
+/*     glBindBuffer(GL_ARRAY_BUFFER, point_buffer); */
+/*     glBufferData(GL_ARRAY_BUFFER, point_size_sum, point_data, GL_STATIC_READ); */
+
+/*     glBindBuffer(GL_ARRAY_BUFFER, g_msdf_index_buffer); */
+/*     glBufferData(GL_ARRAY_BUFFER, sizeof(atlas_index), atlas_index, GL_STATIC_READ); */
+
+/*     glBindBuffer(GL_ARRAY_BUFFER, 0); */
+
+/*     /\* Link sampler textures to the buffers. *\/ */
+/*     glActiveTexture(GL_TEXTURE0); */
+/*     glBindTexture(GL_TEXTURE_BUFFER, meta_texture); */
+/*     glTexBuffer(GL_TEXTURE_BUFFER, GL_R8UI, meta_buffer); */
+/*     glBindTexture(GL_TEXTURE_BUFFER, 0); */
+
+/*     glActiveTexture(GL_TEXTURE1); */
+/*     glBindTexture(GL_TEXTURE_BUFFER, point_texture); */
+/*     glTexBuffer(GL_TEXTURE_BUFFER, GL_R32F, point_buffer); */
+/*     glBindTexture(GL_TEXTURE_BUFFER, 0); */
+
+/*     glActiveTexture(GL_TEXTURE2); */
+/*     glBindTexture(GL_TEXTURE_BUFFER, g_msdf_index_texture); */
+/*     glTexBuffer(GL_TEXTURE_BUFFER, GL_R32F, g_msdf_index_buffer); */
+
+/*     glActiveTexture(GL_TEXTURE0); */
 
 
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+/*     /\* Generate the atlas texture and bind it as the framebuffer. *\/ */
+/*     glBindTexture(GL_TEXTURE_2D, g_msdf_atlas_texture); */
+/*     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR); */
+/*     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR); */
 
-    int msdf_texture_size = FONT_BUFFER_SIZE;
 
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, msdf_texture_size,
-                 msdf_texture_size, 0, GL_RGBA, GL_FLOAT, NULL);
+/*     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); */
+/*     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE); */
 
-    glBindTexture(GL_TEXTURE_2D, 0);
+/*     int msdf_texture_size = FONT_BUFFER_SIZE; */
 
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_BUFFER, meta_texture);
+/*     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, msdf_texture_size, */
+/*                  msdf_texture_size, 0, GL_RGBA, GL_FLOAT, NULL); */
 
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_BUFFER, point_texture);
+/*     glBindTexture(GL_TEXTURE_2D, 0); */
 
-    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, g_msdf_framebuffer);
+/*     glActiveTexture(GL_TEXTURE0); */
+/*     glBindTexture(GL_TEXTURE_BUFFER, meta_texture); */
 
-    glUseProgram(g_msdf_shader);
-    glUniform1i(g_msdf_metadata_uniform, 0);
-    glUniform1i(g_msdf_point_data_uniform, 1);
+/*     glActiveTexture(GL_TEXTURE1); */
+/*     glBindTexture(GL_TEXTURE_BUFFER, point_texture); */
 
-    GLuint vbo;
-    glGenBuffers(1, &vbo);
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
-    glEnableVertexAttribArray(0);
+/*     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, g_msdf_framebuffer); */
 
-    mat4 msdf_projection;
-    glm_ortho(-msdf_texture_size, msdf_texture_size,
-              -msdf_texture_size, msdf_texture_size,
-              -1.0, 1.0, g_msdf_projection);
-    glm_ortho(0, msdf_texture_size,
-              0, msdf_texture_size,
-              -1.0, 1.0, msdf_projection);
+/*     glUseProgram(g_msdf_shader); */
+/*     glUniform1i(g_msdf_metadata_uniform, 0); */
+/*     glUniform1i(g_msdf_point_data_uniform, 1); */
 
-    glUniformMatrix4fv(g_msdf_projection_uniform, 1, GL_FALSE, (GLfloat *) msdf_projection);
-    glUniform2f(g_msdf_scale_uniform, scale, scale);
-    glUniform1f(g_msdf_range_uniform, range);
-    glUniform1i(g_msdf_meta_offset_uniform, 0);
-    glUniform1i(g_msdf_point_offset_uniform, 0);
+/*     GLuint vbo; */
+/*     glGenBuffers(1, &vbo); */
+/*     glBindBuffer(GL_ARRAY_BUFFER, vbo); */
+/*     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0); */
+/*     glEnableVertexAttribArray(0); */
 
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, g_msdf_atlas_texture, 0);
-    CHECK_ERROR
+/*     mat4 msdf_projection; */
+/*     glm_ortho(-msdf_texture_size, msdf_texture_size, */
+/*               -msdf_texture_size, msdf_texture_size, */
+/*               -1.0, 1.0, g_msdf_projection); */
+/*     glm_ortho(0, msdf_texture_size, */
+/*               0, msdf_texture_size, */
+/*               -1.0, 1.0, msdf_projection); */
 
-    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-        printf("framebuffer incomplete: %x\n", glCheckFramebufferStatus(GL_FRAMEBUFFER));
+/*     glUniformMatrix4fv(g_msdf_projection_uniform, 1, GL_FALSE, (GLfloat *) msdf_projection); */
+/*     glUniform2f(g_msdf_scale_uniform, scale, scale); */
+/*     glUniform1f(g_msdf_range_uniform, range); */
+/*     glUniform1i(g_msdf_meta_offset_uniform, 0); */
+/*     glUniform1i(g_msdf_point_offset_uniform, 0); */
 
-    glViewport(0, 0, msdf_texture_size, msdf_texture_size);
+/*     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, g_msdf_atlas_texture, 0); */
+/*     CHECK_ERROR */
 
-    glClearColor(0.0, 0.0, 0.0, 1.0);
-    glClear(GL_COLOR_BUFFER_BIT);
+/*     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) */
+/*         printf("framebuffer incomplete: %x\n", glCheckFramebufferStatus(GL_FRAMEBUFFER)); */
 
-    GLuint _vbo;
-    glGenBuffers(1, &_vbo);
-    glBindBuffer(GL_ARRAY_BUFFER, _vbo);
+/*     glViewport(0, 0, msdf_texture_size, msdf_texture_size); */
 
-    glBufferData(GL_ARRAY_BUFFER, 12 * sizeof(GLfloat), 0, GL_DYNAMIC_DRAW);
+/*     glClearColor(0.0, 0.0, 0.0, 1.0); */
+/*     glClear(GL_COLOR_BUFFER_BIT); */
 
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof (GLfloat), 0);
-    glEnableVertexAttribArray(0);
+/*     GLuint _vbo; */
+/*     glGenBuffers(1, &_vbo); */
+/*     glBindBuffer(GL_ARRAY_BUFFER, _vbo); */
 
-    int meta_offset = 0;
-    int point_offset = 0;
-    for (int i = 0; i < MSDF_PRELOAD_N; ++i) {
-        struct gl_glyph_atlas_item g = atlas_index[i];
-        float w = g.size_x;
-        float h = g.size_y;
-        GLfloat bounding_box[] = {0, 0, w, 0, 0, h, 0, h, w, 0, w, h};
-        glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(bounding_box), bounding_box);
+/*     glBufferData(GL_ARRAY_BUFFER, 12 * sizeof(GLfloat), 0, GL_DYNAMIC_DRAW); */
 
-        glUniform2f(g_msdf_translate_uniform, -g.bearing_x + range / 2.0, 
-                    g.glyph_height - g.bearing_y + range / 2.0);
+/*     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof (GLfloat), 0); */
+/*     glEnableVertexAttribArray(0); */
 
-        glUniform2f(g_msdf_offset_uniform, g.offset_x, g.offset_y);
-        glUniform1i(g_msdf_meta_offset_uniform, meta_offset);
-        glUniform1i(g_msdf_point_offset_uniform, point_offset / (2 * sizeof(GLfloat)));
-        glUniform1f(g_msdf_glyph_height_uniform, g.size_y);
+/*     int meta_offset = 0; */
+/*     int point_offset = 0; */
+/*     for (int i = 0; i < MSDF_PRELOAD_N; ++i) { */
+/*         struct gl_glyph_atlas_item g = atlas_index[i]; */
+/*         float w = g.size_x; */
+/*         float h = g.size_y; */
+/*         GLfloat bounding_box[] = {0, 0, w, 0, 0, h, 0, h, w, 0, w, h}; */
+/*         glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(bounding_box), bounding_box); */
 
-        /* Do not bother rendering control characters */
-        if (i > 31 && !(i > 126 && i < 160))
-            glDrawArrays(GL_TRIANGLES, 0, 6);
+/*         glUniform2f(g_msdf_translate_uniform, -g.bearing_x + range / 2.0,  */
+/*                     g.glyph_height - g.bearing_y + range / 2.0); */
 
-        meta_offset += meta_sizes[i];
-        point_offset += point_sizes[i];
-    }
-    glDisableVertexAttribArray(0);
+/*         glUniform2f(g_msdf_offset_uniform, g.offset_x, g.offset_y); */
+/*         glUniform1i(g_msdf_meta_offset_uniform, meta_offset); */
+/*         glUniform1i(g_msdf_point_offset_uniform, point_offset / (2 * sizeof(GLfloat))); */
+/*         glUniform1f(g_msdf_glyph_height_uniform, g.size_y); */
 
-    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+/*         /\* Do not bother rendering control characters *\/ */
+/*         if (i > 31 && !(i > 126 && i < 160)) */
+/*             glDrawArrays(GL_TRIANGLES, 0, 6); */
 
-    active_font = f;
-}
+/*         meta_offset += meta_sizes[i]; */
+/*         point_offset += point_sizes[i]; */
+/*     } */
+/*     glDisableVertexAttribArray(0); */
+
+/*     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0); */
+
+/*     active_font = f; */
+/* } */
 
 struct font *load_font(const char *font_name, int height) {
 
-    /* eglMakeCurrent(g_gl_display, EGL_NO_SURFACE, EGL_NO_SURFACE, g_root_ctx); */
-    /* msdf_ctx = msdf_gl_create_context(); */
+    eglMakeCurrent(g_gl_display, EGL_NO_SURFACE, EGL_NO_SURFACE, g_root_ctx);
+    msdf_ctx = msdf_gl_create_context();
 
-    /* msdf_gl_load_font(msdf_gl_context_t ctx, const char *font_name, double range, double scale, size_t texture_size) */
+    active_font = msdf_gl_load_font(msdf_ctx, font_name, 4.0, 2.0, FONT_BUFFER_SIZE);
+    fprintf(stderr, "%.f\n", active_font->_msdf_font->underline_thickness);
+    /* return NULL; */
 
-    generate_msdf_atlas(font_name, 2.0, 4.0);
+    msdf_gl_generate_ascii(active_font);
+    /* fprintf() */
+    /* generate_msdf_atlas(font_name, 2.0, 4.0); */
     return (struct font *)1;
 }
 
@@ -590,7 +596,7 @@ struct frame *frame_create() {
     return f;
 }
 
-void draw_text(int x, int y, char *text, size_t len, struct font *font,
+void draw_text(int x, int y, char *text, size_t len, msdf_gl_font_t font,
                uint32_t color, struct window *w, bool flush) {
 
     static struct gl_glyph glyphs[MAX_GLYPHS_PER_DRAW];
@@ -720,6 +726,7 @@ void window_render(struct window *w) {
 
     int ncols = ceil(log10(w->nlines + 1));
     int col_width = active_font->horizontal_advances['8'] * font_size;
+    /* int col_width = 13; */
 
     w->linum_width = col_width * (ncols + 2);  /* Empty column on both sides. */
 
@@ -732,18 +739,18 @@ void window_render(struct window *w) {
     /* Fill column indicator*/
     draw_line(79 * col_width + w->position[1], 0, 79 * col_width + w->position[1], w->height, "0a3749", w);
 
-    struct font *font = active_font;
+    /* struct font *font = active_font; */
     GLuint vao;
     glGenVertexArrays(1, &vao);
     glBindVertexArray(vao);
 
     glActiveTexture(GL_TEXTURE0);
     /* glBindTexture(GL_TEXTURE_2D, font->texture); */
-    glBindTexture(GL_TEXTURE_2D, g_msdf_atlas_texture);
+    glBindTexture(GL_TEXTURE_2D, active_font->atlas_texture);
 
     glActiveTexture(GL_TEXTURE1);
     /* glBindTexture(GL_TEXTURE_BUFFER, font->vertex_texture); */
-    glBindTexture(GL_TEXTURE_BUFFER, g_msdf_index_texture);
+    glBindTexture(GL_TEXTURE_BUFFER, active_font->index_texture);
 
     glBindBuffer(GL_ARRAY_BUFFER, w->text_area_glyphs);
 
@@ -785,7 +792,7 @@ void window_render(struct window *w) {
     glUseProgram(w->frame->text_shader);
     glUniformMatrix4fv(w->frame->projection_uniform, 1, GL_FALSE, (GLfloat *) w->projection);
     /* glUniformMatrix4fv(w->frame->font_projection_uniform, 1, GL_FALSE, (GLfloat *) font->texture_projection); */
-    glUniformMatrix4fv(w->frame->font_projection_uniform, 1, GL_FALSE, (GLfloat *) g_msdf_projection);
+    glUniformMatrix4fv(w->frame->font_projection_uniform, 1, GL_FALSE, (GLfloat *) active_font->projection);
     glUniform1f(w->frame->font_padding_uniform, 2.0);
     glUniform2f(w->frame->offset_uniform, w->position[1] + w->linum_width, w->position[0]);
     glUniform1i(w->frame->font_texture_uniform, 0);
@@ -848,8 +855,8 @@ void window_render(struct window *w) {
     glVertexAttribIPointer(1, 4, GL_UNSIGNED_BYTE, 12, (void *)8);
 
     /* glLineWidth(2.0 * w->frame->scale); */
-    glLineWidth(active_font->msdf_font->underline_thickness * font_size * 2.0);
-    float underline_offset = active_font->msdf_font->underline_y * font_size;
+    glLineWidth(active_font->_msdf_font->underline_thickness * font_size * 2.0);
+    float underline_offset = active_font->_msdf_font->underline_y * font_size;
     /* float underline_offset = 0.0; */
     struct gl_overlay_vertex overlays[] = {
         {13 * col_width, 8 * line_h - underline_offset, 0xc23127ff},

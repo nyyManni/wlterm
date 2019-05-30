@@ -4,6 +4,13 @@
 #else
 /* Figure out something. */
 #endif
+#define CHECK_ERROR                                                  \
+    do {                                                             \
+        GLenum err = glGetError();                                   \
+        if (err) {                                                   \
+            fprintf(stderr, "line %d error: %x \n", __LINE__, err);  \
+        }                                                            \
+    } while (0);
 
 #include "msdf_gl.h"
 
@@ -29,7 +36,7 @@ static inline void _ortho(GLfloat left, GLfloat right, GLfloat bottom, GLfloat t
                           GLfloat nearVal, GLfloat farVal, GLfloat dest[][4]) {
     GLfloat rl, tb, fn;
 
-    memcpy(dest, _MAT4_ZERO_INIT, 16 * sizeof(GLfloat));
+    memcpy(dest, _MAT4_ZERO_INIT, sizeof(_MAT4_ZERO_INIT));
 
     rl = 1.0f / (right - left);
     tb = 1.0f / (top - bottom);
@@ -56,8 +63,14 @@ int compile_shader(const char *source, GLenum type, GLuint *shader) {
 
     GLint status;
     glGetShaderiv(*shader, GL_COMPILE_STATUS, &status);
-    if (!status)
+    if (!status) {
         return 0;
+		char log[1000];
+		GLsizei len;
+		glGetShaderInfoLog(*shader, 1000, &len, log);
+		fprintf(stderr, "Error: compiling: %*s\n",
+			len, log);
+    }
 
     return 1;
 }
@@ -110,6 +123,13 @@ msdf_gl_context_t msdf_gl_create_context() {
         return NULL;
     }
 
+    if (!compile_shader(_font_vertex, GL_VERTEX_SHADER, &vertex_shader))
+        return NULL;
+    if (!compile_shader(_font_geometry, GL_GEOMETRY_SHADER, &geometry_shader))
+        return NULL;
+    if (!compile_shader(_font_fragment, GL_FRAGMENT_SHADER, &fragment_shader))
+        return NULL;
+
     if (!(ctx->render_shader = glCreateProgram()))
         return NULL;
     glAttachShader(ctx->render_shader, vertex_shader);
@@ -128,13 +148,6 @@ msdf_gl_context_t msdf_gl_create_context() {
         return NULL;
     }
 
-    if (!compile_shader(_font_vertex, GL_VERTEX_SHADER, &vertex_shader))
-        return NULL;
-    if (!compile_shader(_font_geometry, GL_GEOMETRY_SHADER, &geometry_shader))
-        return NULL;
-    if (!compile_shader(_font_fragment, GL_FRAGMENT_SHADER, &fragment_shader))
-        return NULL;
-
     ctx->window_projection_uniform = glGetUniformLocation(ctx->render_shader, "projection");
     ctx->_font_projection_uniform = glGetUniformLocation(ctx->render_shader, "font_projection");
     ctx->_font_vertex_uniform = glGetUniformLocation(ctx->render_shader, "font_vertices");
@@ -142,12 +155,19 @@ msdf_gl_context_t msdf_gl_create_context() {
     ctx->_padding_uniform = glGetUniformLocation(ctx->render_shader, "padding");
     ctx->_offset_uniform = glGetUniformLocation(ctx->render_shader, "offset");
 
+    if ((err = glGetError())) {
+        fprintf(stderr, "error: %x \n", err);
+        glDeleteProgram(ctx->gen_shader);
+        glDeleteProgram(ctx->render_shader);
+        return NULL;
+    }
 
     return ctx;
 }
 
+
 msdf_gl_font_t msdf_gl_load_font(msdf_gl_context_t ctx, const char *font_name,
-                                 double range, double scale, size_t texture_size) {
+                                 double range, double scale, int texture_size) {
 
     msdf_gl_font_t f = (msdf_gl_font_t)malloc(sizeof(struct _msdf_gl_font) * 2);
 
@@ -172,7 +192,7 @@ msdf_gl_font_t msdf_gl_load_font(msdf_gl_context_t ctx, const char *font_name,
     return f;
 }
 
-int msdf_gl_render_glyphs(msdf_gl_font_t font, int32_t start, int32_t end) {
+int msdf_gl_generate_glyphs(msdf_gl_font_t font, int32_t start, int32_t end) {
 
     msdf_gl_context_t ctx = font->context;
 
@@ -243,7 +263,7 @@ int msdf_gl_render_glyphs(msdf_gl_font_t font, int32_t start, int32_t end) {
     glBufferData(GL_ARRAY_BUFFER, point_size_sum, point_data, GL_STATIC_READ);
 
     glBindBuffer(GL_ARRAY_BUFFER, font->_index_buffer);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(atlas_index), &atlas_index[0], GL_STATIC_READ);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(atlas_index), atlas_index, GL_STATIC_READ);
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 
@@ -259,8 +279,10 @@ int msdf_gl_render_glyphs(msdf_gl_font_t font, int32_t start, int32_t end) {
     glBindTexture(GL_TEXTURE_BUFFER, 0);
 
     glActiveTexture(GL_TEXTURE2);
+    glGenTextures(1, &font->index_texture);
     glBindTexture(GL_TEXTURE_BUFFER, font->index_texture);
     glTexBuffer(GL_TEXTURE_BUFFER, GL_R32F, font->_index_buffer);
+    glBindTexture(GL_TEXTURE_BUFFER, 0);
 
     glActiveTexture(GL_TEXTURE0);
 
@@ -272,16 +294,8 @@ int msdf_gl_render_glyphs(msdf_gl_font_t font, int32_t start, int32_t end) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
-    /* Generate the atlas texture and bind it as the framebuffer. */
-    glBindTexture(GL_TEXTURE_2D, font->atlas_texture);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, font->texture_size, font->texture_size, 0,
-                 GL_RGBA, GL_FLOAT, NULL);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, font->texture_size, 
+                 font->texture_size, 0, GL_RGBA, GL_FLOAT, NULL);
 
     glBindTexture(GL_TEXTURE_2D, 0);
 
@@ -303,12 +317,13 @@ int msdf_gl_render_glyphs(msdf_gl_font_t font, int32_t start, int32_t end) {
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
     glEnableVertexAttribArray(0);
 
-    GLfloat msdf_projection[4][4];
     _ortho(-font->texture_size, font->texture_size, -font->texture_size,
            font->texture_size, -1.0, 1.0, font->projection);
-    _ortho(0, font->texture_size, 0, font->texture_size, -1.0, 1.0, msdf_projection);
 
+    GLfloat msdf_projection[4][4];
+    _ortho(0, font->texture_size, 0, font->texture_size, -1.0, 1.0, msdf_projection);
     glUniformMatrix4fv(ctx->_projection_uniform, 1, GL_FALSE, (GLfloat *)msdf_projection);
+
     glUniform2f(ctx->_scale_uniform, font->scale, font->scale);
     glUniform1f(ctx->_range_uniform, font->range);
     glUniform1i(ctx->_meta_offset_uniform, 0);
@@ -358,7 +373,28 @@ int msdf_gl_render_glyphs(msdf_gl_font_t font, int32_t start, int32_t end) {
         meta_offset += meta_sizes[i];
         point_offset += point_sizes[i];
     }
+    for (int i = 0; i < 126; ++i) {
+    atlas_index[i].offset_x = 0.0;
+    atlas_index[i].offset_y = 0.0;
+    atlas_index[i].size_x = 20.0;
+    atlas_index[i].size_y = 30.0;
+    atlas_index[i].bearing_x = 0.0;
+    atlas_index[i].bearing_y = 0.0;
+    atlas_index[i].glyph_width = 1.0;
+    atlas_index[i].glyph_height = 3.0;
+    }
+    glBindBuffer(GL_ARRAY_BUFFER, font->_index_buffer);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(atlas_index), atlas_index, GL_STATIC_READ);
+
     glDisableVertexAttribArray(0);
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_BUFFER, 0);
+
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_BUFFER, 0);
+    
+    glUseProgram(0);
 
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
 
@@ -378,6 +414,24 @@ void msdf_gl_destroy_context(msdf_gl_context_t ctx) {
         return;
 
     glDeleteProgram(ctx->gen_shader);
+    glDeleteProgram(ctx->render_shader);
 
     free(ctx);
 }
+void msdf_gl_destroy_font(msdf_gl_font_t font) {
+    
+    glDeleteBuffers(1, &font->_meta_input_buffer);
+    glDeleteBuffers(1, &font->_point_input_buffer);
+    glDeleteTextures(1, &font->_meta_input_texture);
+    glDeleteTextures(1, &font->_point_input_texture);
+
+    glDeleteBuffers(1, &font->_index_buffer);
+    glDeleteTextures(1, &font->index_texture);
+
+    glDeleteTextures(1, &font->atlas_texture);
+    glDeleteFramebuffers(1, &font->_atlas_framebuffer);
+
+    free(font);
+}
+
+/* void msdf_render(msdf_gl_font_t font, ) */

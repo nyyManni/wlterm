@@ -16,14 +16,16 @@ float pxRange = 4.0;
 
 void main() {
     vec2 coords = (font_projection * vec4(text_pos, 0.0, 1.0)).xy;
+    // vec2 coords = (vec4(text_pos, 0.0, 1.0)).xy;
 
     /* Invert the strength so that 1.0 becomes bold and 0.0 becomes thin */
     float threshold = 1.0 - strength;
 
     vec2 msdfUnit = pxRange/vec2(textureSize(font_texture, 0));
     vec3 s = texture(font_texture, coords).rgb;
-    float sigDist = median(s.r, s.g, s.b) - threshold;
-    sigDist *= dot(msdfUnit, 0.5/fwidth(coords));
-    float opacity = clamp(sigDist + 0.5, 0.0, 1.0);
-    color = mix(vec4(0.0, 0.0, 0.0, 0.0), text_color, opacity);
+    color = vec4(s, 1.0);
+    // float sigDist = median(s.r, s.g, s.b) - threshold;
+    // sigDist *= dot(msdfUnit, 0.5/fwidth(coords));
+    // float opacity = clamp(sigDist + 0.5, 0.0, 1.0);
+    // color = mix(vec4(0.0, 0.0, 1.0, 1.0), text_color, opacity);
 }

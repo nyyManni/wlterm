@@ -72,7 +72,7 @@ struct _msdf_gl_font {
 
     double scale;
     double range;
-    size_t texture_size;
+    int texture_size;
 
     double vertical_advance;
     float horizontal_advances[256];
@@ -121,39 +121,50 @@ struct _msdf_gl_font {
 };
 typedef struct _msdf_gl_font *msdf_gl_font_t;
 
+struct msdf_gl_glyph {
+    GLfloat x;
+    GLfloat y; 
+    GLuint color;
+    GLint key;
+    GLfloat size;
+    GLfloat offset;
+    GLfloat skew;
+    GLfloat strength;
+};
+
 /**
  * Load font from a font file and generate textures and buffers for it.
  */
 msdf_gl_font_t msdf_gl_load_font(msdf_gl_context_t ctx, const char *font_name,
-                                 double range, double scale, size_t texture_size);
+                                 double range, double scale, int texture_size);
 
 /**
  * Release resources allocated by `msdf_gl_load_font`.
  */
-/* void msdf_gl_destroy_font(msdf_gl_font_t font); */
+void msdf_gl_destroy_font(msdf_gl_font_t font);
 
 /**
  * Render a single glyph onto the MSFD atlas. Intented use case is to generate
  * the bitmaps on-demand as the characters are appearing.
  */
-/* int msdf_gl_render_glyph(msdf_gl_font_t font, int32_t char_code); */
+int msdf_gl_generate_glyph(msdf_gl_font_t font, int32_t char_code);
 
 /**
  * Render a range of glyphs onto the MSFD atlas. The range is inclusive. Intended
  * use case is to initialize the atlas in the beginning with e.g. ASCII characters.
  */
-int msdf_gl_render_glyphs(msdf_gl_font_t font, int32_t start, int32_t end);
+int msdf_gl_generate_glyphs(msdf_gl_font_t font, int32_t start, int32_t end);
 
 /**
  * Render arbitrary character codes in bulk.
  */
-/* int msdf_gl_render_glyph_list(msdf_gl_font_t font, int32_t *list, size_t n); */
+int msdf_gl_generate_glyph_list(msdf_gl_font_t font, int32_t *list, size_t n);
 
 /**
  * Shortcuts for common needs.
  */
-#define msdf_gl_generate_ascii(font) msdf_gl_render_glyphs(font, 0, 128)
-#define msdf_gl_generate_ascii_ext(font) msdf_gl_render_glyphs(font, 0, 256)
+#define msdf_gl_generate_ascii(font) msdf_gl_generate_glyphs(font, 0, 128)
+#define msdf_gl_generate_ascii_ext(font) msdf_gl_generate_glyphs(font, 0, 256)
 
 #ifdef __cplusplus
 }

@@ -24,7 +24,7 @@
 #define FONT_BUFFER_SIZE 1024
 /* #define FONT_BUFFER_SIZE 512 */
 #define MSDF_PRELOAD_N 254
-#define CHECK_ERROR                                                  \
+#define CHECK_ERROR \
     do {                                                             \
         GLenum err = glGetError();                                   \
         if (err) {                                                   \
@@ -197,19 +197,14 @@ void init_egl() {
     EGLint major, minor, count, n, size, i;
     EGLConfig *configs;
     eglInitialize(g_gl_display, &major, &minor);
-    CHECK_ERROR;
     eglBindAPI(EGL_OPENGL_ES_API);
-    CHECK_ERROR;
     eglGetConfigs(g_gl_display, NULL, 0, &count);
-    CHECK_ERROR;
     configs = calloc(count, sizeof *configs);
     eglChooseConfig(g_gl_display, config_attribs, configs, count, &n);
-    CHECK_ERROR;
     /* eglSwapInterval(g_gl_display, 0); */
 
     for (i = 0; i < n; i++) {
         eglGetConfigAttrib(g_gl_display, configs[i], EGL_BUFFER_SIZE, &size);
-    CHECK_ERROR;
         if (size == 32) {
             g_gl_conf = configs[i];
             break;
@@ -219,14 +214,11 @@ void init_egl() {
     free(configs);
 
     g_root_ctx = eglCreateContext(g_gl_display, g_gl_conf, EGL_NO_CONTEXT, context_attribs);
-    CHECK_ERROR;
     eglMakeCurrent(g_gl_display, EGL_NO_SURFACE, EGL_NO_SURFACE, g_root_ctx);
 
 
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-    CHECK_ERROR;
     eglSwapInterval(g_gl_display, 0);
-    CHECK_ERROR;
 
     /* g_msdf_shader =  create_program("src/msdf_vertex.glsl", */
     /*                                 "src/msdf_fragment.glsl", */
@@ -245,17 +237,12 @@ void init_egl() {
     g_debug_shader = create_program("src/texdebug-vertex.glsl",
                                     "src/texdebug-fragment.glsl",
                                     NULL);
-    GLuint texture_uniform = glGetUniformLocation(g_debug_shader, "tex");
-    CHECK_ERROR;
-    /* glUniform1i(texture_uniform, 0); */
 }
 
 void kill_egl() {
 
     eglTerminate(g_gl_display);
-    CHECK_ERROR;
     eglReleaseThread();
-    CHECK_ERROR;
 }
 
 /* void generate_msdf_atlas(const char *font_name, float scale, float range) { */
@@ -425,7 +412,6 @@ void kill_egl() {
 /*     glUniform1i(g_msdf_point_offset_uniform, 0); */
 
 /*     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, g_msdf_atlas_texture, 0); */
-/*     CHECK_ERROR */
 
 /*     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) */
 /*         printf("framebuffer incomplete: %x\n", glCheckFramebufferStatus(GL_FRAMEBUFFER)); */
@@ -478,7 +464,6 @@ void kill_egl() {
 struct font *load_font(const char *font_name, int height) {
 
     eglMakeCurrent(g_gl_display, EGL_NO_SURFACE, EGL_NO_SURFACE, g_root_ctx);
-    CHECK_ERROR;
     msdf_ctx = msdf_gl_create_context();
 
     active_font = msdf_gl_load_font(msdf_ctx, font_name, 4.0, 2.0, FONT_BUFFER_SIZE);
@@ -545,7 +530,6 @@ struct frame *frame_create() {
 
     /* Share the context between frames */
     f->gl_ctx = eglCreateContext(g_gl_display, g_gl_conf, g_root_ctx, context_attribs);
-    CHECK_ERROR;
 
     f->surface = wl_compositor_create_surface(g_compositor);
     wl_surface_set_user_data(f->surface, f);
@@ -564,13 +548,11 @@ struct frame *frame_create() {
     wl_surface_commit(f->surface);
 
     eglMakeCurrent(g_gl_display, f->gl_surface, f->gl_surface, f->gl_ctx);
-    CHECK_ERROR;
     /* eglSwapInterval(g_gl_display, 0); */
 
     f->bg_shader = create_program("src/bg-vertex.glsl",
                                   "src/bg-fragment.glsl",
                                   NULL);
-    CHECK_ERROR;
     /* f->text_shader = create_program("src/font_vertex.glsl", */
     /*                                 "src/font_fragment.glsl", */
     /*                                 "src/font_geometry.glsl"); */
@@ -579,24 +561,16 @@ struct frame *frame_create() {
                                        "src/overlay-fragment.glsl",
                                        "src/overlay-geometry.glsl");
 
-    CHECK_ERROR;
 
     glEnable(GL_SCISSOR_TEST);
-    CHECK_ERROR;
 
     glGenBuffers(1, &f->root_window->linum_glyphs);
-    CHECK_ERROR;
     glGenBuffers(1, &f->root_window->modeline_glyphs);
-    CHECK_ERROR;
     glGenBuffers(1, &f->root_window->text_area_glyphs);
-    CHECK_ERROR;
 
     glBindBuffer(GL_ARRAY_BUFFER, f->root_window->text_area_glyphs);
-    CHECK_ERROR;
     glBufferData(GL_ARRAY_BUFFER, MAX_GLYPHS_PER_DRAW * sizeof(struct gl_glyph), 0, GL_STATIC_DRAW);
-    CHECK_ERROR;
     glBindBuffer(GL_ARRAY_BUFFER, 0);
-    CHECK_ERROR;
 
     
 
@@ -610,20 +584,15 @@ struct frame *frame_create() {
     /* glUniform1i(active_font->context->_font_vertex_uniform, 1); */
 
     f->overlay_projection_uniform = glGetUniformLocation(f->overlay_shader, "projection");
-    CHECK_ERROR;
     f->overlay_offset_uniform = glGetUniformLocation(f->overlay_shader, "offset");
-    CHECK_ERROR;
 
 
     f->bg_projection_uniform = glGetUniformLocation(f->bg_shader, "projection");
-    CHECK_ERROR;
     f->bg_accent_color_uniform = glGetUniformLocation(f->bg_shader, "accentColor");
-    CHECK_ERROR;
 
     wl_display_roundtrip(g_display);
 
     eglSwapBuffers(g_gl_display, f->gl_surface);
-    CHECK_ERROR;
     struct wl_callback *callback = wl_surface_frame(f->surface);
     wl_callback_add_listener(callback, &frame_listener, f);
     open_frames++;
@@ -662,9 +631,7 @@ void draw_text(int x, int y, char *text, size_t len, msdf_gl_font_t font,
         }
         if (glyph_count == MAX_GLYPHS_PER_DRAW) {
             glBufferSubData(GL_ARRAY_BUFFER, 0, glyph_count * sizeof(struct gl_glyph), glyphs);
-    CHECK_ERROR;
             glDrawArrays(GL_POINTS, 0, glyph_count);
-    CHECK_ERROR;
             glyph_count = 0;
         }
 
@@ -674,9 +641,7 @@ void draw_text(int x, int y, char *text, size_t len, msdf_gl_font_t font,
 
     if (flush && glyph_count) {
         glBufferSubData(GL_ARRAY_BUFFER, 0, glyph_count * sizeof(struct gl_glyph), glyphs);
-    CHECK_ERROR;
         glDrawArrays(GL_POINTS, 0, glyph_count);
-    CHECK_ERROR;
         glyph_count = 0;
     }
 
@@ -687,16 +652,11 @@ void draw_rect(int x, int y, int w, int h, char *color_, struct window *win) {
     vec3 color;
     parse_color(color_, color);
     glUseProgram(win->frame->bg_shader);
-    CHECK_ERROR;
     GLuint vbo;
     glGenBuffers(1, &vbo);
-    CHECK_ERROR;
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    CHECK_ERROR;
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
-    CHECK_ERROR;
     glEnableVertexAttribArray(0);
-    CHECK_ERROR;
 
     GLfloat rect[6][2] = {
         {x, y},
@@ -709,52 +669,34 @@ void draw_rect(int x, int y, int w, int h, char *color_, struct window *win) {
     };
 
     glUniform3fv(win->frame->bg_accent_color_uniform, 1, (GLfloat *) color);
-    CHECK_ERROR;
     glUniformMatrix4fv(win->frame->bg_projection_uniform, 1, GL_FALSE, (GLfloat *) win->projection);
-    CHECK_ERROR;
     glBufferData(GL_ARRAY_BUFFER, 12 * sizeof(GLfloat), (GLfloat *)rect, GL_DYNAMIC_DRAW);
-    CHECK_ERROR;
 
     glDrawArrays(GL_TRIANGLES, 0, 6);
-    CHECK_ERROR;
     glDisableVertexAttribArray(0);
-    CHECK_ERROR;
     glUseProgram(0);
-    CHECK_ERROR;
 }
 
 void draw_line(int x1, int y1, int x2, int y2, char *color_, struct window *win) {
     vec3 color;
     parse_color(color_, color);
     glUseProgram(win->frame->bg_shader);
-    CHECK_ERROR;
     GLuint vbo;
     glGenBuffers(1, &vbo);
-    CHECK_ERROR;
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    CHECK_ERROR;
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
-    CHECK_ERROR;
     glEnableVertexAttribArray(0);
-    CHECK_ERROR;
 
     GLfloat line[2][2] = {{x1, y1}, {x2, y2}};
     glLineWidth(1.0 * win->frame->scale);
-    CHECK_ERROR;
 
     glUniform3fv(win->frame->bg_accent_color_uniform, 1, (GLfloat *) color);
-    CHECK_ERROR;
     glUniformMatrix4fv(win->frame->bg_projection_uniform, 1, GL_FALSE, (GLfloat *) win->projection);
-    CHECK_ERROR;
     glBufferData(GL_ARRAY_BUFFER, 4 * sizeof(GLfloat), (GLfloat *)line, GL_DYNAMIC_DRAW);
-    CHECK_ERROR;
 
     glDrawArrays(GL_LINES, 0, 2);
-    CHECK_ERROR;
     glDisableVertexAttribArray(0);
-    CHECK_ERROR;
     glUseProgram(0);
-    CHECK_ERROR;
 }
 
 int max(int a, int b) { return a > b ? a : b; }
@@ -785,12 +727,10 @@ void window_render(struct window *w) {
     vec3 _color;
     parse_color("0c1014", _color);
     glClearColor(_color[0], _color[1], _color[2], 1.0);
-    CHECK_ERROR;
     glClear(GL_COLOR_BUFFER_BIT);
-    CHECK_ERROR;
 
     /* Modeline */
-    draw_rect(0, w->height - modeline_h, w->width, modeline_h, "0a3749", w);
+    /* draw_rect(0, w->height - modeline_h, w->width, modeline_h, "0a3749", w); */
 
     int ncols = ceil(log10(w->nlines + 1));
     int col_width = active_font->horizontal_advances['8'] * font_size;
@@ -799,240 +739,187 @@ void window_render(struct window *w) {
     w->linum_width = col_width * (ncols + 2);  /* Empty column on both sides. */
 
     /* Line number column */
-    draw_rect(0, 0, w->linum_width, w->height - modeline_h, "11151c", w);
+    /* draw_rect(0, 0, w->linum_width, w->height - modeline_h, "11151c", w); */
 
     set_region(w->frame, w->x + w->linum_width, w->y,
                w->width - w->linum_width, w->height - modeline_h);
 
     /* Fill column indicator*/
-    draw_line(79 * col_width + w->position[1], 0, 79 * col_width + w->position[1], w->height, "0a3749", w);
+    /* draw_line(79 * col_width + w->position[1], 0, 79 * col_width + w->position[1], w->height, "0a3749", w); */
+    msdf_gl_glyph_t glyphs[] = {
+        {100.0, 30.0, 0xffffffff, 'l', (float)font_size, 0.0, 0.0, 1.0},
+        {200.0, 30.0, 0xffffffff, 'o', (float)font_size, 0.0, 0.0, 1.0},
+        {300.0, 30.0, 0xffffffff, 'l', (float)font_size, 0.0, 0.0, 1.0},
+        {400.0, 30.0, 0xffffffff, 'x', (float)font_size, 0.0, 0.0, 1.0},
+        {500.0, 30.0, 0xffffffff, 'd', (float)font_size, 0.0, 0.0, 1.0},
+    };
 
+    msdf_gl_render(active_font, glyphs, 5, (GLfloat *)w->projection);
     /* struct font *font = active_font; */
-    GLuint vao;
-    glGenVertexArrays(1, &vao);
-    CHECK_ERROR;
-    glBindVertexArray(vao);
-    CHECK_ERROR;
-    glUseProgram(active_font->context->render_shader);
-    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    /* GLuint vao; */
+    /* glGenVertexArrays(1, &vao); */
+    /* glBindVertexArray(vao); */
+    /* glUseProgram(active_font->context->render_shader); */
+    /* glPixelStorei(GL_UNPACK_ALIGNMENT, 1); */
 
-    glActiveTexture(GL_TEXTURE0);
-    CHECK_ERROR;
-    /* glBindTexture(GL_TEXTURE_2D, font->texture); */
-    glBindTexture(GL_TEXTURE_2D, active_font->atlas_texture);
-    CHECK_ERROR;
+    /* glActiveTexture(GL_TEXTURE0); */
+    /* /\* glBindTexture(GL_TEXTURE_2D, font->texture); *\/ */
+    /* glBindTexture(GL_TEXTURE_2D, active_font->atlas_texture); */
 
-    glActiveTexture(GL_TEXTURE1);
-    CHECK_ERROR;
-    /* glBindTexture(GL_TEXTURE_BUFFER, font->vertex_texture); */
-    glBindBuffer(GL_ARRAY_BUFFER, active_font->_index_buffer);
-    glBindTexture(GL_TEXTURE_BUFFER, active_font->index_texture);
-    glTexBuffer(GL_TEXTURE_BUFFER, GL_R32F, active_font->_index_buffer);
-    
-    /* GLfloat *mybuf = (GLfloat *)malloc(1000 * sizeof (GLfloat)); */
-    /* glGetTexImage(GL_TEXTURE_BUFFER, 0, GL_R32F, GL_FLOAT, &mybuf[0]); */
-    CHECK_ERROR;
-
-    glUniform1i(active_font->context->_font_texture_uniform, 0);
-    CHECK_ERROR;
-    glUniform1i(active_font->context->_font_vertex_uniform, 1);
-    CHECK_ERROR;
-    /* glActiveTexture(GL_TEXTURE2); */
+    /* glActiveTexture(GL_TEXTURE1); */
+    /* /\* glBindTexture(GL_TEXTURE_BUFFER, font->vertex_texture); *\/ */
+    /* /\* glBindBuffer(GL_ARRAY_BUFFER, active_font->_index_buffer); *\/ */
     /* glBindTexture(GL_TEXTURE_BUFFER, active_font->index_texture); */
-    /* glTexParameteri(GL_TEXTURE_BUFFER, GL_TEXTURE_MIN_FILTER, GL_LINEAR); */
-    /* glTexParameteri(GL_TEXTURE_BUFFER, GL_TEXTURE_MAG_FILTER, GL_LINEAR); */
-    CHECK_ERROR;
-    CHECK_ERROR;
+    /* /\* glTexBuffer(GL_TEXTURE_BUFFER, GL_R32F, active_font->_index_buffer); *\/ */
+    
+    /* /\* GLfloat *mybuf = (GLfloat *)malloc(1000 * sizeof (GLfloat)); *\/ */
+    /* /\* glGetTexImage(GL_TEXTURE_BUFFER, 0, GL_R32F, GL_FLOAT, &mybuf[0]); *\/ */
+
+    /* glUniform1i(active_font->context->_atlas_uniform, 0); */
+    /* glUniform1i(active_font->context->_index_uniform, 1); */
+    /* /\* glActiveTexture(GL_TEXTURE2); *\/ */
+    /* /\* glBindTexture(GL_TEXTURE_BUFFER, active_font->index_texture); *\/ */
+    /* /\* glTexParameteri(GL_TEXTURE_BUFFER, GL_TEXTURE_MIN_FILTER, GL_LINEAR); *\/ */
+    /* /\* glTexParameteri(GL_TEXTURE_BUFFER, GL_TEXTURE_MAG_FILTER, GL_LINEAR); *\/ */
 
 
-    glBindBuffer(GL_ARRAY_BUFFER, w->text_area_glyphs);
-    CHECK_ERROR;
+    /* glBindBuffer(GL_ARRAY_BUFFER, w->text_area_glyphs); */
 
-    glEnableVertexAttribArray(0);
-    CHECK_ERROR;
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE,
-                          sizeof(struct gl_glyph),
-                          (void *)offsetof(struct gl_glyph, x));
-    CHECK_ERROR;
+    /* glEnableVertexAttribArray(0); */
+    /* glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, */
+    /*                       sizeof(struct gl_glyph), */
+    /*                       (void *)offsetof(struct gl_glyph, x)); */
 
-    glEnableVertexAttribArray(1);
-    CHECK_ERROR;
-    glVertexAttribIPointer(1, 4, GL_UNSIGNED_BYTE,
-                           sizeof(struct gl_glyph),
-                           (void *)offsetof(struct gl_glyph, color));
-    CHECK_ERROR;
+    /* glEnableVertexAttribArray(1); */
+    /* glVertexAttribIPointer(1, 4, GL_UNSIGNED_BYTE, */
+    /*                        sizeof(struct gl_glyph), */
+    /*                        (void *)offsetof(struct gl_glyph, color)); */
 
-    glEnableVertexAttribArray(2);
-    CHECK_ERROR;
-    glVertexAttribIPointer(2, 1, GL_INT,
-                           sizeof(struct gl_glyph),
-                           (void *)offsetof(struct gl_glyph, key));
+    /* glEnableVertexAttribArray(2); */
+    /* glVertexAttribIPointer(2, 1, GL_INT, */
+    /*                        sizeof(struct gl_glyph), */
+    /*                        (void *)offsetof(struct gl_glyph, key)); */
 
-    CHECK_ERROR;
-    glEnableVertexAttribArray(3);
-    CHECK_ERROR;
-    glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE,
-                          sizeof(struct gl_glyph),
-                          (void *)offsetof(struct gl_glyph, size));
-    CHECK_ERROR;
+    /* glEnableVertexAttribArray(3); */
+    /* glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, */
+    /*                       sizeof(struct gl_glyph), */
+    /*                       (void *)offsetof(struct gl_glyph, size)); */
 
-    glEnableVertexAttribArray(4);
-    CHECK_ERROR;
-    glVertexAttribPointer(4, 1, GL_FLOAT, GL_FALSE,
-                           sizeof(struct gl_glyph),
-                          (void *)offsetof(struct gl_glyph, offset));
-    CHECK_ERROR;
+    /* glEnableVertexAttribArray(4); */
+    /* glVertexAttribPointer(4, 1, GL_FLOAT, GL_FALSE, */
+    /*                        sizeof(struct gl_glyph), */
+    /*                       (void *)offsetof(struct gl_glyph, offset)); */
 
-    glEnableVertexAttribArray(5);
-    CHECK_ERROR;
-    glVertexAttribPointer(5, 1, GL_FLOAT,GL_FALSE,
-                           sizeof(struct gl_glyph),
-                          (void *)offsetof(struct gl_glyph, skew));
-    CHECK_ERROR;
+    /* glEnableVertexAttribArray(5); */
+    /* glVertexAttribPointer(5, 1, GL_FLOAT,GL_FALSE, */
+    /*                        sizeof(struct gl_glyph), */
+    /*                       (void *)offsetof(struct gl_glyph, skew)); */
 
-    glEnableVertexAttribArray(6);
-    CHECK_ERROR;
-    glVertexAttribPointer(6, 1, GL_FLOAT,GL_FALSE,
-                           sizeof(struct gl_glyph),
-                          (void *)offsetof(struct gl_glyph, strength));
-    CHECK_ERROR;
+    /* glEnableVertexAttribArray(6); */
+    /* glVertexAttribPointer(6, 1, GL_FLOAT,GL_FALSE, */
+    /*                        sizeof(struct gl_glyph), */
+    /*                       (void *)offsetof(struct gl_glyph, strength)); */
 
-    CHECK_ERROR;
-    /* glUniformMatrix4fv(w->frame->projection_uniform, 1, GL_FALSE, (GLfloat *) w->projection); */
-    /* glUniformMatrix4fv(w->frame->font_projection_uniform, 1, GL_FALSE, (GLfloat *) font->texture_projection); */
-    glUniformMatrix4fv(active_font->context->window_projection_uniform, 1, 
-                       GL_FALSE, (GLfloat *)w->projection);
-    glUniformMatrix4fv(active_font->context->_font_projection_uniform, 1, 
-                       GL_FALSE, (GLfloat *) active_font->projection);
-    CHECK_ERROR;
-    glUniform1f(active_font->context->_padding_uniform, 2.0);
-    CHECK_ERROR;
-    glUniform2f(active_font->context->_offset_uniform, w->position[1] + w->linum_width, w->position[0]);
-    CHECK_ERROR;
 
-    /* Draw buffer text. */
-    double line_h = active_font->vertical_advance * font_size;
-    if (w->contents) {
-        for (int i = 0; i < w->nlines; ++i) {
-            int vscroll_lines = i * line_h;
-            if (vscroll_lines < -w->position[0] - line_h) continue;
-            if (vscroll_lines > -w->position[0] + (w->height + line_h)) break;
-            draw_text(0.0, line_h * (i + 1), w->contents[i], strlen(w->contents[i]),
-                  active_font, 0xffffffff /* color */, w, false /* flush */);
-        }
-        draw_text(0.0, 0.0, "", 0, active_font, 0, w, true /* flush */);
-    }
+    /* /\* glUniformMatrix4fv(w->frame->projection_uniform, 1, GL_FALSE, (GLfloat *) w->projection); *\/ */
+    /* /\* glUniformMatrix4fv(w->frame->font_projection_uniform, 1, GL_FALSE, (GLfloat *) font->texture_projection); *\/ */
+    /* glUniformMatrix4fv(active_font->context->window_projection_uniform, 1,  */
+    /*                    GL_FALSE, (GLfloat *)w->projection); */
+    /* glUniformMatrix4fv(active_font->context->_font_atlas_projection_uniform, 1,  */
+    /*                    GL_FALSE, (GLfloat *) active_font->atlas_projection); */
+    /* glUniform1f(active_font->context->_padding_uniform, 2.0); */
+    /* glUniform2f(active_font->context->_offset_uniform, w->position[1] + w->linum_width, w->position[0]); */
 
-    set_region(w->frame, w->x, w->y, w->linum_width, w->height - modeline_h);
-    glUniform2f(active_font->context->_offset_uniform, 0.0, w->position[0]);
-    CHECK_ERROR;
-    char buf[36];
+    /* /\* Draw buffer text. *\/ */
+    /* double line_h = active_font->vertical_advance * font_size; */
+    /* if (w->contents) { */
+    /*     for (int i = 0; i < w->nlines; ++i) { */
+    /*         int vscroll_lines = i * line_h; */
+    /*         if (vscroll_lines < -w->position[0] - line_h) continue; */
+    /*         if (vscroll_lines > -w->position[0] + (w->height + line_h)) break; */
+    /*         draw_text(0.0, line_h * (i + 1), w->contents[i], strlen(w->contents[i]), */
+    /*               active_font, 0xffffffff /\* color *\/, w, false /\* flush *\/); */
+    /*     } */
+    /*     draw_text(0.0, 0.0, "", 0, active_font, 0, w, true /\* flush *\/); */
+    /* } */
 
-    /* Draw line numbers */
-    for (int i = 0; i < w->nlines; ++i) {
-        int vscroll_lines = i * line_h;
-        if (vscroll_lines < -w->position[0] - line_h) continue;
-        if (vscroll_lines > -w->position[0] + (w->height + line_h)) break;
-        int _n = sprintf(buf, "%*d", ncols, i + 1);
-        draw_text(col_width, line_h * (i + 1), buf, _n,
-                  active_font, 0x0a3749ff /* color */, w, false /* flush */);
-    }
-    draw_text(0, 0, "", 0, active_font, 0, w, true /* flush */);
+    /* /\* set_region(w->frame, w->x, w->y, w->linum_width, w->height - modeline_h); *\/ */
+    /* /\* glUniform2f(active_font->context->_offset_uniform, 0.0, w->position[0]); *\/ */
+    /* /\* char buf[36]; *\/ */
 
-    glDisableVertexAttribArray(0);
-    CHECK_ERROR;
-    glDisableVertexAttribArray(1);
-    CHECK_ERROR;
-    glDisableVertexAttribArray(2);
-    CHECK_ERROR;
-    glDisableVertexAttribArray(3);
-    CHECK_ERROR;
-    glDisableVertexAttribArray(4);
-    CHECK_ERROR;
-    glDisableVertexAttribArray(5);
-    CHECK_ERROR;
-    glBindVertexArray(0);
-    CHECK_ERROR;
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    CHECK_ERROR;
-    glUseProgram(0);
-    CHECK_ERROR;
+    /* /\* /\\* Draw line numbers *\\/ *\/ */
+    /* /\* for (int i = 0; i < w->nlines; ++i) { *\/ */
+    /* /\*     int vscroll_lines = i * line_h; *\/ */
+    /* /\*     if (vscroll_lines < -w->position[0] - line_h) continue; *\/ */
+    /* /\*     if (vscroll_lines > -w->position[0] + (w->height + line_h)) break; *\/ */
+    /* /\*     int _n = sprintf(buf, "%*d", ncols, i + 1); *\/ */
+    /* /\*     draw_text(col_width, line_h * (i + 1), buf, _n, *\/ */
+    /* /\*               active_font, 0x0a3749ff /\\* color *\\/, w, false /\\* flush *\\/); *\/ */
+    /* /\* } *\/ */
+    /* /\* draw_text(0, 0, "", 0, active_font, 0, w, true /\\* flush *\\/); *\/ */
+
+    /* glDisableVertexAttribArray(0); */
+    /* glDisableVertexAttribArray(1); */
+    /* glDisableVertexAttribArray(2); */
+    /* glDisableVertexAttribArray(3); */
+    /* glDisableVertexAttribArray(4); */
+    /* glDisableVertexAttribArray(5); */
+    /* glBindVertexArray(0); */
+    /* glBindBuffer(GL_ARRAY_BUFFER, 0); */
+    /* glUseProgram(0); */
 
     /* Overlays */
-    glUseProgram(w->frame->overlay_shader);
-    CHECK_ERROR;
-    glUniformMatrix4fv(w->frame->overlay_projection_uniform, 1, GL_FALSE, (GLfloat *) w->projection);
-    CHECK_ERROR;
-    glUniform2f(w->frame->overlay_offset_uniform, w->position[1] + w->linum_width, w->position[0]);
-    CHECK_ERROR;
+    /* glUseProgram(w->frame->overlay_shader); */
+    /* glUniformMatrix4fv(w->frame->overlay_projection_uniform, 1, GL_FALSE, (GLfloat *) w->projection); */
+    /* glUniform2f(w->frame->overlay_offset_uniform, w->position[1] + w->linum_width, w->position[0]); */
 
     set_region(w->frame, w->x + w->linum_width, w->y,
                w->width - w->linum_width, w->height - modeline_h);
 
-    GLuint vbo;
-    GLuint _vao;
-    glGenVertexArrays(1, &_vao);
-    CHECK_ERROR;
-    glBindVertexArray(_vao);
-    CHECK_ERROR;
-    glGenBuffers(1, &vbo);
-    CHECK_ERROR;
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    CHECK_ERROR;
-    glEnableVertexAttribArray(0);
-    CHECK_ERROR;
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 12, 0);
-    CHECK_ERROR;
-    glEnableVertexAttribArray(1);
-    CHECK_ERROR;
-    glVertexAttribIPointer(1, 4, GL_UNSIGNED_BYTE, 12, (void *)8);
-    CHECK_ERROR;
+    /* GLuint vbo; */
+    /* GLuint _vao; */
+    /* glGenVertexArrays(1, &_vao); */
+    /* glBindVertexArray(_vao); */
+    /* glGenBuffers(1, &vbo); */
+    /* glBindBuffer(GL_ARRAY_BUFFER, vbo); */
+    /* glEnableVertexAttribArray(0); */
+    /* glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 12, 0); */
+    /* glEnableVertexAttribArray(1); */
+    /* glVertexAttribIPointer(1, 4, GL_UNSIGNED_BYTE, 12, (void *)8); */
 
     /* glLineWidth(2.0 * w->frame->scale); */
-    glLineWidth(active_font->_msdf_font->underline_thickness * font_size * 2.0);
-    CHECK_ERROR;
-    float underline_offset = active_font->_msdf_font->underline_y * font_size;
-    /* float underline_offset = 0.0; */
-    struct gl_overlay_vertex overlays[] = {
-        {13 * col_width, 8 * line_h - underline_offset, 0xc23127ff},
-        {26 * col_width, 8 * line_h - underline_offset, 0xc23127ff},
-        /* {3 * col_width, 30 * active_font->vertical_advance, 0xc23127ff}, */
-        /* {15 * col_width, 30 * active_font->vertical_advance, 0xc23127ff}, */
-    };
-    glBufferData(GL_ARRAY_BUFFER, sizeof(overlays), (GLfloat *)overlays, GL_DYNAMIC_DRAW);
-    CHECK_ERROR;
-    glDrawArrays(GL_LINES, 0, 2);
-    CHECK_ERROR;
+    /* glLineWidth(active_font->_msdf_font->underline_thickness * font_size * 2.0); */
+    /* float underline_offset = active_font->_msdf_font->underline_y * font_size; */
+    /* /\* float underline_offset = 0.0; *\/ */
+    /* struct gl_overlay_vertex overlays[] = { */
+    /*     {13 * col_width, 8 * line_h - underline_offset, 0xc23127ff}, */
+    /*     {26 * col_width, 8 * line_h - underline_offset, 0xc23127ff}, */
+    /*     /\* {3 * col_width, 30 * active_font->vertical_advance, 0xc23127ff}, *\/ */
+    /*     /\* {15 * col_width, 30 * active_font->vertical_advance, 0xc23127ff}, *\/ */
+    /* }; */
+    /* glBufferData(GL_ARRAY_BUFFER, sizeof(overlays), (GLfloat *)overlays, GL_DYNAMIC_DRAW); */
+    /* glDrawArrays(GL_LINES, 0, 2); */
 
-    glBindVertexArray(0);
-    CHECK_ERROR;
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    CHECK_ERROR;
-    glUseProgram(0);
-    CHECK_ERROR;
+    /* glBindVertexArray(0); */
+    /* glBindBuffer(GL_ARRAY_BUFFER, 0); */
+    /* glUseProgram(0); */
 
     glActiveTexture(GL_TEXTURE0);
-    CHECK_ERROR;
-    /* glBindTexture(GL_TEXTURE_2D, active_font->msdf_atlas_texture); */
-    CHECK_ERROR;
-    CHECK_ERROR;
+    glBindTexture(GL_TEXTURE_2D, active_font->atlas_texture);
     /* glBindTexture(GL_TEXTURE_2D, g_msdf_atlas_texture); */
     /* glBindTexture(GL_TEXTURE_BUFFER, active_font->index_texture); */
-    CHECK_ERROR;
 
 
     glUseProgram(g_debug_shader);
-    CHECK_ERROR;
+
+    GLuint texture_uniform = glGetUniformLocation(g_debug_shader, "tex");
+    glUniform1i(texture_uniform, 0);
 
     GLuint _vbo;
     glGenBuffers(1, &_vbo);
-    CHECK_ERROR;
     glBindBuffer(GL_ARRAY_BUFFER, _vbo);
-    CHECK_ERROR;
     glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 0, 0);
-    CHECK_ERROR;
     glEnableVertexAttribArray(0);
-    CHECK_ERROR;
 
     GLfloat rect[6][4] = {
         /* {0, 0, -2, -2}, */
@@ -1052,13 +939,10 @@ void window_render(struct window *w) {
     };
 
     glBufferData(GL_ARRAY_BUFFER, 24 * sizeof(GLfloat), (GLfloat *)rect, GL_DYNAMIC_DRAW);
-    CHECK_ERROR;
 
     glDrawArrays(GL_TRIANGLES, 0, 6);
-    CHECK_ERROR;
 
     glBindTexture(GL_TEXTURE_2D, 0);
-    CHECK_ERROR;
 
     /* GLfloat rect2[6][4] = { */
     /*     /\* {0, 0, -2, -2}, *\/ */
@@ -1077,52 +961,37 @@ void window_render(struct window *w) {
     /*     {1, 0, 1, 0} */
     /* }; */
     /* glActiveTexture(GL_TEXTURE2); */
-    /* CHECK_ERROR; */
     /* glBindTexture(GL_TEXTURE_BUFFER, active_font->index_texture); */
-    /* CHECK_ERROR; */
 
     /* glBufferData(GL_ARRAY_BUFFER, 24 * sizeof(GLfloat), (GLfloat *)rect2, GL_DYNAMIC_DRAW); */
-    /* CHECK_ERROR; */
-    /* CHECK_ERROR; */
 
     /* glDrawArrays(GL_TRIANGLES, 0, 6); */
-    /* CHECK_ERROR; */
-    /* glUseProgram(0); */
-    /* CHECK_ERROR; */
+    glUseProgram(0);
 }
 
 void frame_render(struct frame *f) {
 
     eglMakeCurrent(g_gl_display, f->gl_surface, f->gl_surface, f->gl_ctx);
-    CHECK_ERROR;
     /* eglSwapInterval(g_gl_display, 0); */
 
     glViewport(0, 0, f->width * f->scale, f->height * f->scale);
-    CHECK_ERROR;
     glEnable(GL_BLEND);
-    CHECK_ERROR;
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    CHECK_ERROR;
 
     set_region(f, 0, f->height - f->minibuffer_height, f->width, f->minibuffer_height);
     vec3 _color;
     parse_color("0c1014", _color);
     glClearColor(_color[0], _color[1], _color[2], 1.0);
-    CHECK_ERROR;
     glClear(GL_COLOR_BUFFER_BIT);
-    CHECK_ERROR;
 
     FOR_EACH_WINDOW (f, w) {
         window_render(w);
     }
 
     glBindTexture(GL_TEXTURE_2D, 0);
-    CHECK_ERROR;
     glDisableVertexAttribArray(0);
-    CHECK_ERROR;
 
     eglSwapBuffers(g_gl_display, f->gl_surface);
-    CHECK_ERROR;
 }
 
 void frame_close(struct frame *f) {

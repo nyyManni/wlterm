@@ -30,30 +30,29 @@ extern "C" {
 struct _msdf_gl_context {
     GLuint gen_shader;
 
-    GLuint _projection_uniform;
-    GLuint _texture_offset_uniform;
-    GLuint _translate_uniform;
-    GLuint _scale_uniform;
-    GLuint _range_uniform;
-    GLuint _glyph_height_uniform;
+    GLint _atlas_projection_uniform;
+    GLint _texture_offset_uniform;
+    GLint _translate_uniform;
+    GLint _scale_uniform;
+    GLint _range_uniform;
+    GLint _glyph_height_uniform;
 
-    GLuint _meta_offset_uniform;
-    GLuint _point_offset_uniform;
+    GLint _meta_offset_uniform;
+    GLint _point_offset_uniform;
 
-    GLuint metadata_uniform;
-    GLuint point_data_uniform;
+    GLint metadata_uniform;
+    GLint point_data_uniform;
 
     GLuint render_shader;
 
-    GLuint window_projection_uniform;
-    GLuint _font_projection_uniform;
-    GLuint _font_vertex_uniform;
-    GLuint _font_texture_uniform;
-    GLuint _padding_uniform;
-    GLuint _offset_uniform;
+    GLint window_projection_uniform;
+    GLint _font_atlas_projection_uniform;
+    GLint _index_uniform;
+    GLint _atlas_uniform;
+    GLint _padding_uniform;
+    GLint _offset_uniform;
 };
 typedef struct _msdf_gl_context *msdf_gl_context_t;
-
 
 /**
  * Compile shaders and configure uniforms.
@@ -77,7 +76,7 @@ struct _msdf_gl_font {
     double vertical_advance;
     float horizontal_advances[256];
 
-    GLfloat projection[4][4];
+    GLfloat atlas_projection[4][4];
 
     /**
      * 2D RGBA atlas texture containing all MSDF-glyph bitmaps.
@@ -117,20 +116,19 @@ struct _msdf_gl_font {
     GLuint _point_input_texture;
 
     msdf_font_handle _msdf_font;
-
 };
 typedef struct _msdf_gl_font *msdf_gl_font_t;
 
-struct msdf_gl_glyph {
+typedef struct _msdf_gl_glyph {
     GLfloat x;
-    GLfloat y; 
+    GLfloat y;
     GLuint color;
     GLint key;
     GLfloat size;
     GLfloat offset;
     GLfloat skew;
     GLfloat strength;
-};
+} msdf_gl_glyph_t;
 
 /**
  * Load font from a font file and generate textures and buffers for it.
@@ -161,10 +159,16 @@ int msdf_gl_generate_glyphs(msdf_gl_font_t font, int32_t start, int32_t end);
 int msdf_gl_generate_glyph_list(msdf_gl_font_t font, int32_t *list, size_t n);
 
 /**
- * Shortcuts for common needs.
+ * Shortcuts for common generators.
  */
 #define msdf_gl_generate_ascii(font) msdf_gl_generate_glyphs(font, 0, 128)
 #define msdf_gl_generate_ascii_ext(font) msdf_gl_generate_glyphs(font, 0, 256)
+
+/**
+ * Render a list of glyphs.
+ */
+void msdf_gl_render(msdf_gl_font_t font, msdf_gl_glyph_t *glyphs, int n,
+                    GLfloat *projection);
 
 #ifdef __cplusplus
 }

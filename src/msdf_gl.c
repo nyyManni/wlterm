@@ -4,6 +4,7 @@
 #else
 /* Figure out something. */
 #endif
+
 #define CHECK_ERROR                                                  \
     do {                                                             \
         GLenum err = glGetError();                                   \
@@ -103,7 +104,7 @@ msdf_gl_context_t msdf_gl_create_context() {
     if (!status)
         return NULL;
 
-    ctx->_projection_uniform = glGetUniformLocation(ctx->gen_shader, "projection");
+    ctx->_atlas_projection_uniform = glGetUniformLocation(ctx->gen_shader, "projection");
     ctx->_texture_offset_uniform = glGetUniformLocation(ctx->gen_shader, "offset");
     ctx->_translate_uniform = glGetUniformLocation(ctx->gen_shader, "translate");
     ctx->_scale_uniform = glGetUniformLocation(ctx->gen_shader, "scale");
@@ -149,9 +150,9 @@ msdf_gl_context_t msdf_gl_create_context() {
     }
 
     ctx->window_projection_uniform = glGetUniformLocation(ctx->render_shader, "projection");
-    ctx->_font_projection_uniform = glGetUniformLocation(ctx->render_shader, "font_projection");
-    ctx->_font_vertex_uniform = glGetUniformLocation(ctx->render_shader, "font_vertices");
-    ctx->_font_texture_uniform = glGetUniformLocation(ctx->render_shader, "font_texture");
+    ctx->_font_atlas_projection_uniform = glGetUniformLocation(ctx->render_shader, "font_projection");
+    ctx->_index_uniform = glGetUniformLocation(ctx->render_shader, "font_vertices");
+    ctx->_atlas_uniform = glGetUniformLocation(ctx->render_shader, "font_texture");
     ctx->_padding_uniform = glGetUniformLocation(ctx->render_shader, "padding");
     ctx->_offset_uniform = glGetUniformLocation(ctx->render_shader, "offset");
 
@@ -279,7 +280,6 @@ int msdf_gl_generate_glyphs(msdf_gl_font_t font, int32_t start, int32_t end) {
     glBindTexture(GL_TEXTURE_BUFFER, 0);
 
     glActiveTexture(GL_TEXTURE2);
-    glGenTextures(1, &font->index_texture);
     glBindTexture(GL_TEXTURE_BUFFER, font->index_texture);
     glTexBuffer(GL_TEXTURE_BUFFER, GL_R32F, font->_index_buffer);
     glBindTexture(GL_TEXTURE_BUFFER, 0);
@@ -318,11 +318,11 @@ int msdf_gl_generate_glyphs(msdf_gl_font_t font, int32_t start, int32_t end) {
     glEnableVertexAttribArray(0);
 
     _ortho(-font->texture_size, font->texture_size, -font->texture_size,
-           font->texture_size, -1.0, 1.0, font->projection);
+           font->texture_size, -1.0, 1.0, font->atlas_projection);
 
     GLfloat msdf_projection[4][4];
     _ortho(0, font->texture_size, 0, font->texture_size, -1.0, 1.0, msdf_projection);
-    glUniformMatrix4fv(ctx->_projection_uniform, 1, GL_FALSE, (GLfloat *)msdf_projection);
+    glUniformMatrix4fv(ctx->_atlas_projection_uniform, 1, GL_FALSE, (GLfloat *)msdf_projection);
 
     glUniform2f(ctx->_scale_uniform, font->scale, font->scale);
     glUniform1f(ctx->_range_uniform, font->range);
@@ -434,4 +434,134 @@ void msdf_gl_destroy_font(msdf_gl_font_t font) {
     free(font);
 }
 
-/* void msdf_render(msdf_gl_font_t font, ) */
+
+
+void msdf_gl_render(msdf_gl_font_t font, msdf_gl_glyph_t *glyphs, int n,
+                    GLfloat *projection) {
+    
+    GLuint glyph_buffer;
+    GLuint vao;
+    glGenBuffers(1, &glyph_buffer);
+    CHECK_ERROR;
+    glGenVertexArrays(1, &vao);
+    CHECK_ERROR;
+    glBindVertexArray(vao);
+    CHECK_ERROR;
+    glBindBuffer(GL_ARRAY_BUFFER, glyph_buffer);
+    CHECK_ERROR;
+    glBufferData(GL_ARRAY_BUFFER, n * sizeof(struct  _msdf_gl_glyph), 
+                 &glyphs[0], GL_DYNAMIC_DRAW);
+    CHECK_ERROR;
+
+    glEnableVertexAttribArray(0);
+    CHECK_ERROR;
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(struct _msdf_gl_glyph),
+                          (void *)offsetof(struct _msdf_gl_glyph, x));
+    CHECK_ERROR;
+
+    glEnableVertexAttribArray(1);
+    CHECK_ERROR;
+    glVertexAttribIPointer(1, 4, GL_UNSIGNED_BYTE, sizeof(struct _msdf_gl_glyph),
+                           (void *)offsetof(struct _msdf_gl_glyph, color));
+    CHECK_ERROR;
+
+    glEnableVertexAttribArray(2);
+    CHECK_ERROR;
+    glVertexAttribIPointer(2, 1, GL_INT, sizeof(struct _msdf_gl_glyph),
+                           (void *)offsetof(struct _msdf_gl_glyph, key));
+    CHECK_ERROR;
+
+    glEnableVertexAttribArray(3);
+    CHECK_ERROR;
+    glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, sizeof(struct _msdf_gl_glyph),
+                          (void *)offsetof(struct _msdf_gl_glyph, size));
+    CHECK_ERROR;
+
+    glEnableVertexAttribArray(4);
+    CHECK_ERROR;
+    glVertexAttribPointer(4, 1, GL_FLOAT, GL_FALSE, sizeof(struct _msdf_gl_glyph),
+                          (void *)offsetof(struct _msdf_gl_glyph, offset));
+    CHECK_ERROR;
+
+    glEnableVertexAttribArray(5);
+    CHECK_ERROR;
+    glVertexAttribPointer(5, 1, GL_FLOAT,GL_FALSE, sizeof(struct _msdf_gl_glyph),
+                          (void *)offsetof(struct _msdf_gl_glyph, skew));
+    CHECK_ERROR;
+
+    glEnableVertexAttribArray(6);
+    CHECK_ERROR;
+    glVertexAttribPointer(6, 1, GL_FLOAT,GL_FALSE, sizeof(struct _msdf_gl_glyph),
+                          (void *)offsetof(struct _msdf_gl_glyph, strength));
+    CHECK_ERROR;
+
+    glUseProgram(font->context->render_shader);
+    CHECK_ERROR;
+
+    /* Bind atlas texture and index buffer. */
+    glActiveTexture(GL_TEXTURE0);
+    CHECK_ERROR;
+    glBindTexture(GL_TEXTURE_2D, font->atlas_texture);
+    CHECK_ERROR;
+    glUniform1i(font->context->_atlas_uniform, 0);
+    CHECK_ERROR;
+
+    glActiveTexture(GL_TEXTURE1);
+    CHECK_ERROR;
+    glBindTexture(GL_TEXTURE_BUFFER, font->index_texture);
+    CHECK_ERROR;
+    glUniform1i(font->context->_index_uniform, 1);
+    CHECK_ERROR;
+
+    glUniformMatrix4fv(font->context->_font_atlas_projection_uniform, 1, GL_FALSE, 
+                       (GLfloat *)font->atlas_projection);
+    CHECK_ERROR;
+
+    glUniformMatrix4fv(font->context->window_projection_uniform, 1, GL_FALSE, projection);
+    CHECK_ERROR;
+    
+    /* TODO: Window offset. */
+    glUniform2f(font->context->_offset_uniform, 0.0, 0.0);
+    CHECK_ERROR;
+
+    glUniform1f(font->context->_padding_uniform, (GLfloat)(font->range / 2.0));
+    CHECK_ERROR;
+    
+    /* Render the glyphs. */
+    glDrawArrays(GL_POINTS, 0, n);
+    CHECK_ERROR;
+
+    /* Clean up. */
+    glActiveTexture(GL_TEXTURE1);
+    CHECK_ERROR;
+    glBindTexture(GL_TEXTURE_BUFFER, 0);
+    CHECK_ERROR;
+
+    glActiveTexture(GL_TEXTURE0);
+    CHECK_ERROR;
+    glBindTexture(GL_TEXTURE_2D, 0);
+    CHECK_ERROR;
+
+    glUseProgram(0);
+    CHECK_ERROR;
+
+    glDisableVertexAttribArray(0);
+    CHECK_ERROR;
+    glDisableVertexAttribArray(1);
+    CHECK_ERROR;
+    glDisableVertexAttribArray(2);
+    CHECK_ERROR;
+    glDisableVertexAttribArray(3);
+    CHECK_ERROR;
+    glDisableVertexAttribArray(4);
+    CHECK_ERROR;
+    glDisableVertexAttribArray(5);
+    CHECK_ERROR;
+    glDisableVertexAttribArray(6);
+    CHECK_ERROR;
+
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    CHECK_ERROR;
+    glBindVertexArray(0);
+    CHECK_ERROR;
+}

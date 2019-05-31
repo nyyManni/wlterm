@@ -583,12 +583,12 @@ struct frame *frame_create() {
     /* glUniform1i(active_font->context->_font_texture_uniform, 0); */
     /* glUniform1i(active_font->context->_font_vertex_uniform, 1); */
 
-    f->overlay_projection_uniform = glGetUniformLocation(f->overlay_shader, "projection");
-    f->overlay_offset_uniform = glGetUniformLocation(f->overlay_shader, "offset");
+    /* f->overlay_projection_uniform = glGetUniformLocation(f->overlay_shader, "projection"); */
+    /* f->overlay_offset_uniform = glGetUniformLocation(f->overlay_shader, "offset"); */
 
 
-    f->bg_projection_uniform = glGetUniformLocation(f->bg_shader, "projection");
-    f->bg_accent_color_uniform = glGetUniformLocation(f->bg_shader, "accentColor");
+    /* f->bg_projection_uniform = glGetUniformLocation(f->bg_shader, "projection"); */
+    /* f->bg_accent_color_uniform = glGetUniformLocation(f->bg_shader, "accentColor"); */
 
     wl_display_roundtrip(g_display);
 
@@ -741,17 +741,17 @@ void window_render(struct window *w) {
     /* Line number column */
     /* draw_rect(0, 0, w->linum_width, w->height - modeline_h, "11151c", w); */
 
-    set_region(w->frame, w->x + w->linum_width, w->y,
-               w->width - w->linum_width, w->height - modeline_h);
+    /* set_region(w->frame, w->x + w->linum_width, w->y, */
+    /*            w->width - w->linum_width, w->height - modeline_h); */
 
     /* Fill column indicator*/
     /* draw_line(79 * col_width + w->position[1], 0, 79 * col_width + w->position[1], w->height, "0a3749", w); */
     msdf_gl_glyph_t glyphs[] = {
-        {100.0, 30.0, 0xffffffff, 'l', (float)font_size, 0.0, 0.0, 1.0},
-        {200.0, 30.0, 0xffffffff, 'o', (float)font_size, 0.0, 0.0, 1.0},
-        {300.0, 30.0, 0xffffffff, 'l', (float)font_size, 0.0, 0.0, 1.0},
-        {400.0, 30.0, 0xffffffff, 'x', (float)font_size, 0.0, 0.0, 1.0},
-        {500.0, 30.0, 0xffffffff, 'd', (float)font_size, 0.0, 0.0, 1.0},
+        {100.0, 30.0, 0xffffffff, 'l', (float)font_size, 0.0, 0.0, 0.5},
+        {200.0, 30.0, 0xffffffff, 'o', (float)font_size, 0.0, 0.0, 0.5},
+        {300.0, 30.0, 0xffffffff, 'l', (float)font_size, 0.0, 0.0, 0.5},
+        {400.0, 30.0, 0xffffffff, 'x', (float)font_size, 0.0, 0.0, 0.5},
+        {500.0, 30.0, 0xffffffff, 'd', (float)font_size, 0.0, 0.0, 0.5},
     };
 
     msdf_gl_render(active_font, glyphs, 5, (GLfloat *)w->projection);
@@ -873,8 +873,8 @@ void window_render(struct window *w) {
     /* glUniformMatrix4fv(w->frame->overlay_projection_uniform, 1, GL_FALSE, (GLfloat *) w->projection); */
     /* glUniform2f(w->frame->overlay_offset_uniform, w->position[1] + w->linum_width, w->position[0]); */
 
-    set_region(w->frame, w->x + w->linum_width, w->y,
-               w->width - w->linum_width, w->height - modeline_h);
+    /* set_region(w->frame, w->x + w->linum_width, w->y, */
+    /*            w->width - w->linum_width, w->height - modeline_h); */
 
     /* GLuint vbo; */
     /* GLuint _vao; */
@@ -904,7 +904,7 @@ void window_render(struct window *w) {
     /* glBindBuffer(GL_ARRAY_BUFFER, 0); */
     /* glUseProgram(0); */
 
-    glActiveTexture(GL_TEXTURE0);
+    glActiveTexture(GL_TEXTURE8);
     glBindTexture(GL_TEXTURE_2D, active_font->atlas_texture);
     /* glBindTexture(GL_TEXTURE_2D, g_msdf_atlas_texture); */
     /* glBindTexture(GL_TEXTURE_BUFFER, active_font->index_texture); */
@@ -913,7 +913,7 @@ void window_render(struct window *w) {
     glUseProgram(g_debug_shader);
 
     GLuint texture_uniform = glGetUniformLocation(g_debug_shader, "tex");
-    glUniform1i(texture_uniform, 0);
+    glUniform1i(texture_uniform, 8);
 
     GLuint _vbo;
     glGenBuffers(1, &_vbo);

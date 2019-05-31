@@ -27,31 +27,6 @@
 extern "C" {
 #endif
 
-struct _msdf_gl_context {
-    GLuint gen_shader;
-
-    GLint _atlas_projection_uniform;
-    GLint _texture_offset_uniform;
-    GLint _translate_uniform;
-    GLint _scale_uniform;
-    GLint _range_uniform;
-    GLint _glyph_height_uniform;
-
-    GLint _meta_offset_uniform;
-    GLint _point_offset_uniform;
-
-    GLint metadata_uniform;
-    GLint point_data_uniform;
-
-    GLuint render_shader;
-
-    GLint window_projection_uniform;
-    GLint _font_atlas_projection_uniform;
-    GLint _index_uniform;
-    GLint _atlas_uniform;
-    GLint _padding_uniform;
-    GLint _offset_uniform;
-};
 typedef struct _msdf_gl_context *msdf_gl_context_t;
 
 /**
@@ -90,6 +65,11 @@ struct _msdf_gl_font {
      */
     GLuint index_texture;
     GLuint _index_buffer;
+    
+    /**
+     * Amount of glyphs currently rendered on the textures.
+     */
+    size_t nglyphs;
 
     /**
      * MSDF_GL context handle.

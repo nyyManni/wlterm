@@ -28,6 +28,32 @@ typedef struct msdf_gl_index_entry {
     GLfloat glyph_height;
 } msdf_gl_index_entry;
 
+struct _msdf_gl_context {
+    GLuint gen_shader;
+
+    GLint _atlas_projection_uniform;
+    GLint _texture_offset_uniform;
+    GLint _translate_uniform;
+    GLint _scale_uniform;
+    GLint _range_uniform;
+    GLint _glyph_height_uniform;
+
+    GLint _meta_offset_uniform;
+    GLint _point_offset_uniform;
+
+    GLint metadata_uniform;
+    GLint point_data_uniform;
+
+    GLuint render_shader;
+
+    GLint window_projection_uniform;
+    GLint _font_atlas_projection_uniform;
+    GLint _index_uniform;
+    GLint _atlas_uniform;
+    GLint _padding_uniform;
+    GLint _offset_uniform;
+};
+
 GLfloat _MAT4_ZERO_INIT[4][4] = {{0.0f, 0.0f, 0.0f, 0.0f},
                                  {0.0f, 0.0f, 0.0f, 0.0f},
                                  {0.0f, 0.0f, 0.0f, 0.0f},
@@ -151,8 +177,8 @@ msdf_gl_context_t msdf_gl_create_context() {
 
     ctx->window_projection_uniform = glGetUniformLocation(ctx->render_shader, "projection");
     ctx->_font_atlas_projection_uniform = glGetUniformLocation(ctx->render_shader, "font_projection");
-    ctx->_index_uniform = glGetUniformLocation(ctx->render_shader, "font_vertices");
-    ctx->_atlas_uniform = glGetUniformLocation(ctx->render_shader, "font_texture");
+    ctx->_index_uniform = glGetUniformLocation(ctx->render_shader, "font_index");
+    ctx->_atlas_uniform = glGetUniformLocation(ctx->render_shader, "font_atlas");
     ctx->_padding_uniform = glGetUniformLocation(ctx->render_shader, "padding");
     ctx->_offset_uniform = glGetUniformLocation(ctx->render_shader, "offset");
 
@@ -178,6 +204,7 @@ msdf_gl_font_t msdf_gl_load_font(msdf_gl_context_t ctx, const char *font_name,
     f->range = range;
     f->texture_size = texture_size;
     f->context = ctx;
+    f->nglyphs = 0;
 
     glGenBuffers(1, &f->_meta_input_buffer);
     glGenBuffers(1, &f->_point_input_buffer);
@@ -223,6 +250,7 @@ int msdf_gl_generate_glyphs(msdf_gl_font_t font, int32_t start, int32_t end) {
     char *meta_ptr = metadata;
     char *point_ptr = point_data;
     float offset_x = 1, offset_y = 1, y_increment = 0;
+    size_t index_size_sum = 0;
     for (size_t i = 0; i <= end - start; ++i) {
         float glyph_width, glyph_height, buffer_width, buffer_height;
         float bearing_x, bearing_y, advance;
@@ -254,6 +282,7 @@ int msdf_gl_generate_glyphs(msdf_gl_font_t font, int32_t start, int32_t end) {
         font->horizontal_advances[i + start] = advance;
 
         offset_x += buffer_width + 1;
+        index_size_sum += 8 * sizeof(GLfloat);
     }
 
     /* Allocate and fill the buffers on GPU. */
@@ -264,7 +293,8 @@ int msdf_gl_generate_glyphs(msdf_gl_font_t font, int32_t start, int32_t end) {
     glBufferData(GL_ARRAY_BUFFER, point_size_sum, point_data, GL_STATIC_READ);
 
     glBindBuffer(GL_ARRAY_BUFFER, font->_index_buffer);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(atlas_index), atlas_index, GL_STATIC_READ);
+    /* glBufferData(GL_ARRAY_BUFFER, sizeof(atlas_index), atlas_index, GL_STATIC_READ); */
+    glBufferData(GL_ARRAY_BUFFER, index_size_sum, atlas_index, GL_STATIC_READ);
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 
@@ -373,18 +403,6 @@ int msdf_gl_generate_glyphs(msdf_gl_font_t font, int32_t start, int32_t end) {
         meta_offset += meta_sizes[i];
         point_offset += point_sizes[i];
     }
-    for (int i = 0; i < 126; ++i) {
-    atlas_index[i].offset_x = 0.0;
-    atlas_index[i].offset_y = 0.0;
-    atlas_index[i].size_x = 20.0;
-    atlas_index[i].size_y = 30.0;
-    atlas_index[i].bearing_x = 0.0;
-    atlas_index[i].bearing_y = 0.0;
-    atlas_index[i].glyph_width = 1.0;
-    atlas_index[i].glyph_height = 3.0;
-    }
-    glBindBuffer(GL_ARRAY_BUFFER, font->_index_buffer);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(atlas_index), atlas_index, GL_STATIC_READ);
 
     glDisableVertexAttribArray(0);
 
@@ -418,6 +436,7 @@ void msdf_gl_destroy_context(msdf_gl_context_t ctx) {
 
     free(ctx);
 }
+
 void msdf_gl_destroy_font(msdf_gl_font_t font) {
     
     glDeleteBuffers(1, &font->_meta_input_buffer);
@@ -434,134 +453,87 @@ void msdf_gl_destroy_font(msdf_gl_font_t font) {
     free(font);
 }
 
-
-
 void msdf_gl_render(msdf_gl_font_t font, msdf_gl_glyph_t *glyphs, int n,
                     GLfloat *projection) {
     
     GLuint glyph_buffer;
     GLuint vao;
     glGenBuffers(1, &glyph_buffer);
-    CHECK_ERROR;
     glGenVertexArrays(1, &vao);
-    CHECK_ERROR;
     glBindVertexArray(vao);
-    CHECK_ERROR;
     glBindBuffer(GL_ARRAY_BUFFER, glyph_buffer);
-    CHECK_ERROR;
     glBufferData(GL_ARRAY_BUFFER, n * sizeof(struct  _msdf_gl_glyph), 
                  &glyphs[0], GL_DYNAMIC_DRAW);
-    CHECK_ERROR;
 
     glEnableVertexAttribArray(0);
-    CHECK_ERROR;
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(struct _msdf_gl_glyph),
                           (void *)offsetof(struct _msdf_gl_glyph, x));
-    CHECK_ERROR;
 
     glEnableVertexAttribArray(1);
-    CHECK_ERROR;
     glVertexAttribIPointer(1, 4, GL_UNSIGNED_BYTE, sizeof(struct _msdf_gl_glyph),
                            (void *)offsetof(struct _msdf_gl_glyph, color));
-    CHECK_ERROR;
 
     glEnableVertexAttribArray(2);
-    CHECK_ERROR;
     glVertexAttribIPointer(2, 1, GL_INT, sizeof(struct _msdf_gl_glyph),
                            (void *)offsetof(struct _msdf_gl_glyph, key));
-    CHECK_ERROR;
 
     glEnableVertexAttribArray(3);
-    CHECK_ERROR;
     glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, sizeof(struct _msdf_gl_glyph),
                           (void *)offsetof(struct _msdf_gl_glyph, size));
-    CHECK_ERROR;
 
     glEnableVertexAttribArray(4);
-    CHECK_ERROR;
     glVertexAttribPointer(4, 1, GL_FLOAT, GL_FALSE, sizeof(struct _msdf_gl_glyph),
                           (void *)offsetof(struct _msdf_gl_glyph, offset));
-    CHECK_ERROR;
 
     glEnableVertexAttribArray(5);
-    CHECK_ERROR;
     glVertexAttribPointer(5, 1, GL_FLOAT,GL_FALSE, sizeof(struct _msdf_gl_glyph),
                           (void *)offsetof(struct _msdf_gl_glyph, skew));
-    CHECK_ERROR;
 
     glEnableVertexAttribArray(6);
-    CHECK_ERROR;
     glVertexAttribPointer(6, 1, GL_FLOAT,GL_FALSE, sizeof(struct _msdf_gl_glyph),
                           (void *)offsetof(struct _msdf_gl_glyph, strength));
-    CHECK_ERROR;
 
     glUseProgram(font->context->render_shader);
-    CHECK_ERROR;
 
     /* Bind atlas texture and index buffer. */
     glActiveTexture(GL_TEXTURE0);
-    CHECK_ERROR;
     glBindTexture(GL_TEXTURE_2D, font->atlas_texture);
-    CHECK_ERROR;
     glUniform1i(font->context->_atlas_uniform, 0);
-    CHECK_ERROR;
 
     glActiveTexture(GL_TEXTURE1);
-    CHECK_ERROR;
     glBindTexture(GL_TEXTURE_BUFFER, font->index_texture);
-    CHECK_ERROR;
     glUniform1i(font->context->_index_uniform, 1);
-    CHECK_ERROR;
 
     glUniformMatrix4fv(font->context->_font_atlas_projection_uniform, 1, GL_FALSE, 
                        (GLfloat *)font->atlas_projection);
-    CHECK_ERROR;
 
     glUniformMatrix4fv(font->context->window_projection_uniform, 1, GL_FALSE, projection);
-    CHECK_ERROR;
     
     /* TODO: Window offset. */
     glUniform2f(font->context->_offset_uniform, 0.0, 0.0);
-    CHECK_ERROR;
 
     glUniform1f(font->context->_padding_uniform, (GLfloat)(font->range / 2.0));
-    CHECK_ERROR;
     
     /* Render the glyphs. */
     glDrawArrays(GL_POINTS, 0, n);
-    CHECK_ERROR;
 
     /* Clean up. */
     glActiveTexture(GL_TEXTURE1);
-    CHECK_ERROR;
     glBindTexture(GL_TEXTURE_BUFFER, 0);
-    CHECK_ERROR;
 
     glActiveTexture(GL_TEXTURE0);
-    CHECK_ERROR;
     glBindTexture(GL_TEXTURE_2D, 0);
-    CHECK_ERROR;
 
     glUseProgram(0);
-    CHECK_ERROR;
 
     glDisableVertexAttribArray(0);
-    CHECK_ERROR;
     glDisableVertexAttribArray(1);
-    CHECK_ERROR;
     glDisableVertexAttribArray(2);
-    CHECK_ERROR;
     glDisableVertexAttribArray(3);
-    CHECK_ERROR;
     glDisableVertexAttribArray(4);
-    CHECK_ERROR;
     glDisableVertexAttribArray(5);
-    CHECK_ERROR;
     glDisableVertexAttribArray(6);
-    CHECK_ERROR;
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
-    CHECK_ERROR;
     glBindVertexArray(0);
-    CHECK_ERROR;
 }

@@ -466,11 +466,12 @@ struct font *load_font(const char *font_name, int height) {
     eglMakeCurrent(g_gl_display, EGL_NO_SURFACE, EGL_NO_SURFACE, g_root_ctx);
     msdf_ctx = msdf_gl_create_context();
 
-    active_font = msdf_gl_load_font(msdf_ctx, font_name, 4.0, 2.0, FONT_BUFFER_SIZE);
+    active_font = msdf_gl_load_font(msdf_ctx, font_name, 4.0, 2.0, 0);
     /* fprintf(stderr, "%.f\n", active_font->_msdf_font->underline_thickness); */
     /* return NULL; */
 
     msdf_gl_generate_ascii(active_font);
+    /* msdf_gl_generate_ascii(active_font); */
     /* fprintf() */
     /* generate_msdf_atlas(font_name, 2.0, 4.0); */
     return (struct font *)1;
@@ -929,12 +930,12 @@ void window_render(struct window *w) {
         /* {0, 1, -2, 2}, */
         /* {1, 0, 2, -2}, */
         /* {1, 1, 2, 2} */
-        {0, 0, 0, 1},
+        {0, -0.8, 0, 1},
         {0, 1, 0, 0},
-        {1, 0, 1, 1},
+        {1, -0.8, 1, 1},
 
         {0, 1, 0, 0},
-        {1, 0, 1, 1},
+        {1, -0.8, 1, 1},
         {1, 1, 1, 0}
     };
 

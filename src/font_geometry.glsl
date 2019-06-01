@@ -36,7 +36,6 @@ void main() {
     vec4 bearing = vec4(texelFetch(font_index, _offset + 4).r,
                         -texelFetch(font_index, _offset + 5).r, 0.0, 0.0) * font_size;
 
-
     vec4 glyph_width = vec4(texelFetch(font_index, _offset + 6).r, 0.0, 0.0, 0.0) * font_size;
     vec4 glyph_height = vec4(0.0, texelFetch(font_index, _offset + 7).r, 0.0, 0.0) * font_size;
 

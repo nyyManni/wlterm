@@ -46,7 +46,7 @@ struct _msdf_gl_font {
 
     double scale;
     double range;
-    int texture_size;
+    int texture_width;
 
     double vertical_advance;
     float horizontal_advances[256];
@@ -69,7 +69,17 @@ struct _msdf_gl_font {
     /**
      * Amount of glyphs currently rendered on the textures.
      */
-    size_t nglyphs;
+    size_t _nglyphs;
+    
+    /**
+     * The current size of the buffer index texture.
+     */
+    size_t _nallocated;
+    
+    /**
+     * The amount of allocated texture height.
+     */
+    int _texture_height;
 
     /**
      * MSDF_GL context handle.

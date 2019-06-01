@@ -21,6 +21,8 @@
 #include "egl_window.h"
 #include "egl_util.h"
 
+#include "msdf_gl.h"
+
 struct wl_display *g_display;
 struct wl_compositor *g_compositor;
 struct wl_seat *g_seat;
@@ -35,6 +37,7 @@ struct wl_shm *g_shm;
 extern struct frame *frames[];
 extern int open_frames;
 
+extern msdf_gl_font_t active_font;
 
 static void pointer_handle_enter(void *data, struct wl_pointer *pointer, uint32_t serial,
                                  struct wl_surface *surface, wl_fixed_t sx,
@@ -223,6 +226,9 @@ static void keyboard_key(void *data, struct wl_keyboard *wl_keyboard, uint32_t s
         return;
     if (sym == XKB_KEY_c) {
         frame_close(selected_frame);
+    } else if (sym == XKB_KEY_r) {
+        msdf_gl_generate_ascii(active_font);
+        wl_surface_commit(selected_frame->surface);
     } else if (sym == XKB_KEY_n) {
         frame_create();
     }

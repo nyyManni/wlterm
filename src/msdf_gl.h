@@ -29,6 +29,26 @@ extern "C" {
 
 typedef struct _msdf_gl_context *msdf_gl_context_t;
 
+typedef struct _map_elem {
+    int key;
+    int index;
+    double horizontal_advance;
+} map_elem_t;
+
+typedef struct _msdfgl_elem_list {
+    struct _msdfgl_elem_list *next;
+    map_elem_t data[];
+} msdfgl_elem_list_t;
+
+typedef struct _msdfgl_map {
+    void *root;
+    size_t chunk_size;
+
+    size_t i;
+    msdfgl_elem_list_t *cur_list;
+    msdfgl_elem_list_t *elems;
+} msdfgl_map_t;
+
 /**
  * Compile shaders and configure uniforms.
  *
@@ -50,6 +70,8 @@ struct _msdf_gl_font {
 
     double vertical_advance;
     float horizontal_advances[256];
+    
+    msdfgl_map_t character_index;
 
     GLfloat atlas_projection[4][4];
 
@@ -95,6 +117,7 @@ struct _msdf_gl_font {
      * The location in the atlas where the next bitmap would be rendered.
      */
     size_t _offset_y;
+    size_t _y_increment;
     size_t _offset_x;
 
     /**

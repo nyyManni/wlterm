@@ -466,7 +466,7 @@ struct font *load_font(const char *font_name, int height) {
     eglMakeCurrent(g_gl_display, EGL_NO_SURFACE, EGL_NO_SURFACE, g_root_ctx);
     msdf_ctx = msdf_gl_create_context();
 
-    active_font = msdf_gl_load_font(msdf_ctx, font_name, 4.0, 2.0, 0);
+    active_font = msdf_gl_load_font(msdf_ctx, font_name, 4.0, 2.0, 512);
     /* fprintf(stderr, "%.f\n", active_font->_msdf_font->underline_thickness); */
     /* return NULL; */
 
@@ -748,14 +748,54 @@ void window_render(struct window *w) {
     /* Fill column indicator*/
     /* draw_line(79 * col_width + w->position[1], 0, 79 * col_width + w->position[1], w->height, "0a3749", w); */
     msdf_gl_glyph_t glyphs[] = {
-        {100.0, 30.0, 0xffffffff, 'l', (float)font_size, 0.0, 0.0, 0.5},
-        {200.0, 30.0, 0xffffffff, 'o', (float)font_size, 0.0, 0.0, 0.5},
-        {300.0, 30.0, 0xffffffff, 'l', (float)font_size, 0.0, 0.0, 0.5},
+
+        {0.0  , 30.0, 0xffffffff, 'A', (float)font_size, 0.0, 0.0, 0.5},
+        {25.0 , 30.0, 0xffffffff, ' ', (float)font_size, 0.0, 0.0, 0.5},
+        {50.0 , 30.0, 0xffffffff, 'q', (float)font_size, 0.0, 0.0, 0.5},
+        {75.0 , 30.0, 0xffffffff, 'u', (float)font_size, 0.0, 0.0, 0.5},
+        {100.0, 30.0, 0xffffffff, 'i', (float)font_size, 0.0, 0.0, 0.5},
+        {125.0, 30.0, 0xffffffff, 'c', (float)font_size, 0.0, 0.0, 0.5},
+        {150.0, 30.0, 0xffffffff, 'k', (float)font_size, 0.0, 0.0, 0.5},
+        {175.0, 30.0, 0xffffffff, ' ', (float)font_size, 0.0, 0.0, 0.5},
+        {200.0, 30.0, 0xffffffff, 'b', (float)font_size, 0.0, 0.0, 0.5},
+        {225.0, 30.0, 0xffffffff, 'r', (float)font_size, 0.0, 0.0, 0.5},
+        {250.0, 30.0, 0xffffffff, 'o', (float)font_size, 0.0, 0.0, 0.5},
+        {275.0, 30.0, 0xffffffff, 'w', (float)font_size, 0.0, 0.0, 0.5},
+        {300.0, 30.0, 0xffffffff, 'n', (float)font_size, 0.0, 0.0, 0.5},
+        {325.0, 30.0, 0xffffffff, ' ', (float)font_size, 0.0, 0.0, 0.5},
+        {350.0, 30.0, 0xffffffff, 'f', (float)font_size, 0.0, 0.0, 0.5},
+        {375.0, 30.0, 0xffffffff, 'o', (float)font_size, 0.0, 0.0, 0.5},
         {400.0, 30.0, 0xffffffff, 'x', (float)font_size, 0.0, 0.0, 0.5},
-        {500.0, 30.0, 0xffffffff, 'd', (float)font_size, 0.0, 0.0, 0.5},
+
+        {0.0  , 80.0, 0xffffffff, 'j', (float)font_size, 0.0, 0.0, 0.5},
+        {25.0 , 80.0, 0xffffffff, 'u', (float)font_size, 0.0, 0.0, 0.5},
+        {50.0 , 80.0, 0xffffffff, 'm', (float)font_size, 0.0, 0.0, 0.5},
+        {75.0 , 80.0, 0xffffffff, 'p', (float)font_size, 0.0, 0.0, 0.5},
+        {100.0, 80.0, 0xffffffff, 'e', (float)font_size, 0.0, 0.0, 0.5},
+        {125.0, 80.0, 0xffffffff, 'd', (float)font_size, 0.0, 0.0, 0.5},
+        {150.0, 80.0, 0xffffffff, ' ', (float)font_size, 0.0, 0.0, 0.5},
+        {175.0, 80.0, 0xffffffff, 'o', (float)font_size, 0.0, 0.0, 0.5},
+        {200.0, 80.0, 0xffffffff, 'v', (float)font_size, 0.0, 0.0, 0.5},
+        {225.0, 80.0, 0xffffffff, 'e', (float)font_size, 0.0, 0.0, 0.5},
+        {250.0, 80.0, 0xffffffff, 'r', (float)font_size, 0.0, 0.0, 0.5},
+        {275.0, 80.0, 0xffffffff, ' ', (float)font_size, 0.0, 0.0, 0.5},
+        {300.0, 80.0, 0xffffffff, 'a', (float)font_size, 0.0, 0.0, 0.5},
+        {325.0, 80.0, 0xffffffff, ' ', (float)font_size, 0.0, 0.0, 0.5},
+        {350.0, 80.0, 0xffffffff, 'l', (float)font_size, 0.0, 0.0, 0.5},
+        {375.0, 80.0, 0xffffffff, 'a', (float)font_size, 0.0, 0.0, 0.5},
+        {400.0, 80.0, 0xffffffff, 'z', (float)font_size, 0.0, 0.0, 0.5},
+        {425.0, 80.0, 0xffffffff, 'y', (float)font_size, 0.0, 0.0, 0.5},
+        {450.0, 80.0, 0xffffffff, ' ', (float)font_size, 0.0, 0.0, 0.5},
+        {475.0, 80.0, 0xffffffff, 'd', (float)font_size, 0.0, 0.0, 0.5},
+        {500.0, 80.0, 0xffffffff, 'o', (float)font_size, 0.0, 0.0, 0.5},
+        {525.0, 80.0, 0xffffffff, 'g', (float)font_size, 0.0, 0.0, 0.5},
+        {550.0, 80.0, 0xffffffff, '.', (float)font_size, 0.0, 0.0, 0.5},
+
+
+        /* {600.0, 80.0, 0xffffffff, 0x00e4, (float)font_size, 0.0, 0.0, 0.5}, */
     };
 
-    msdf_gl_render(active_font, glyphs, 5, (GLfloat *)w->projection);
+    msdf_gl_render(active_font, glyphs, sizeof(glyphs) / sizeof(msdf_gl_glyph_t), (GLfloat *)w->projection);
     /* struct font *font = active_font; */
     /* GLuint vao; */
     /* glGenVertexArrays(1, &vao); */

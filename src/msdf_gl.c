@@ -1,5 +1,10 @@
 
+
+#include <search.h>
+
 #ifdef __linux__
+
+/* We don't want to link to any specific OpenGL implementation. */
 #define GL_GLEXT_PROTOTYPES
 #else
 /* Figure out something. */
@@ -16,6 +21,53 @@
 #include "msdf_gl.h"
 
 #include "_msdf_shaders.h"
+
+
+
+int comparator(const void *a, const void *b) {
+    return ((map_elem_t *)a)->key - ((map_elem_t *)b)->key;
+}
+
+int msdfgl_map_create(msdfgl_map_t *map, size_t chunk) {
+    map->root = 0;
+    map->i = 0;
+    map->chunk_size = chunk;
+
+    map->elems = (msdfgl_elem_list_t *)malloc(sizeof(msdfgl_elem_list_t) +
+                                              map->chunk_size * sizeof(map_elem_t));
+    if (!map->elems) return -1;
+    map->elems->next = NULL;
+    map->cur_list = map->elems;
+    return 0;
+}
+
+map_elem_t *msdfgl_map_insert(msdfgl_map_t *map, int key) {
+    if (map->i == map->chunk_size) {
+        /* Allocate a new list */
+        msdfgl_elem_list_t *l = (msdfgl_elem_list_t *)malloc(
+            sizeof(msdfgl_elem_list_t) + map->chunk_size * sizeof(map_elem_t));
+        if (!l) return NULL;
+        l->next = NULL;
+        map->cur_list->next = l;
+        map->cur_list = l;
+        map->i = 0;
+    }
+
+    map->cur_list->data[map->i].key = key;
+    if (!tsearch((void *)&map->cur_list->data[map->i], &map->root, comparator))
+        return NULL;
+
+    map_elem_t *p = &map->cur_list->data[map->i];
+    map->i++;
+    return p;
+}
+
+map_elem_t *msdfgl_map_get(msdfgl_map_t *map, int key) {
+    map_elem_t e;
+    e.key = key;
+    map_elem_t **r = (map_elem_t **)tfind((void *)&e, &map->root, comparator);
+    return r ? *r : NULL;
+}
 
 typedef struct msdf_gl_index_entry {
     GLfloat offset_x;
@@ -199,6 +251,8 @@ msdf_gl_font_t msdf_gl_load_font(msdf_gl_context_t ctx, const char *font_name,
                                  double range, double scale, int texture_size) {
 
     msdf_gl_font_t f = (msdf_gl_font_t)malloc(sizeof(struct _msdf_gl_font) * 2);
+    if (!f)
+        return NULL;
 
     f->_msdf_font = msdf_load_font(font_name);
 
@@ -213,6 +267,7 @@ msdf_gl_font_t msdf_gl_load_font(msdf_gl_context_t ctx, const char *font_name,
     f->_offset_x = 1;
     f->_offset_y = 1;
     f->_texture_height = 0;
+    msdfgl_map_create(&f->character_index, 256);
 
     glGenBuffers(1, &f->_meta_input_buffer);
     glGenBuffers(1, &f->_point_input_buffer);
@@ -231,20 +286,28 @@ msdf_gl_font_t msdf_gl_load_font(msdf_gl_context_t ctx, const char *font_name,
 int msdf_gl_generate_glyphs(msdf_gl_font_t font, int32_t start, int32_t end) {
 
     msdf_gl_context_t ctx = font->context;
+    int retval = -2;
 
-    if (end - start <= 0)
+    if (end - start < 0)
         return -1;
 
     /* We will start with a square texture. */
     int new_texture_height = font->_texture_height ? font->_texture_height : 1;
+    int new_index_size = font->_nallocated ? font->_nallocated : 1;
 
     /* Calculate the amount of memory needed on the GPU.*/
     size_t *meta_sizes = (size_t *)malloc((end - start + 1) * sizeof(size_t));
+    if (!meta_sizes)
+        goto error;
     size_t *point_sizes = (size_t *)malloc((end - start + 1) * sizeof(size_t));
+    if (!point_sizes)
+        goto error;
 
     /* Amount of new memory needed for the index. */
     size_t index_size = (end - start + 1) * sizeof(msdf_gl_index_entry);
     msdf_gl_index_entry *atlas_index = (msdf_gl_index_entry *)malloc(index_size);
+    if (!atlas_index)
+        goto error;
 
     size_t meta_size_sum = 0, point_size_sum = 0;
     for (size_t i = 0; i <= end - start; ++i) {
@@ -256,19 +319,25 @@ int msdf_gl_generate_glyphs(msdf_gl_font_t font, int32_t start, int32_t end) {
 
     /* Allocate the calculated amount. */
     void *point_data = malloc(point_size_sum);
+    if (!point_data)
+        goto error;
     void *metadata = malloc(meta_size_sum);
+    if (!metadata)
+        goto error;
 
     /* Serialize the glyphs into RAM. */
     font->vertical_advance = font->_msdf_font->height;
     char *meta_ptr = metadata;
     char *point_ptr = point_data;
-    float y_increment = 0;
     for (size_t i = 0; i <= end - start; ++i) {
         float glyph_width, glyph_height, buffer_width, buffer_height;
         float bearing_x, bearing_y, advance;
         msdf_serialize_glyph(font->_msdf_font, start + i, meta_ptr, point_ptr,
                              &glyph_width, &glyph_height, &bearing_x, &bearing_y,
                              &advance);
+        map_elem_t *m = msdfgl_map_insert(&font->character_index, start + i);
+        m->index = font->_nglyphs + i;
+        m->horizontal_advance = advance;
 
         buffer_width = (glyph_width + font->range) * font->scale;
         buffer_height = (glyph_height + font->range) * font->scale;
@@ -277,11 +346,11 @@ int msdf_gl_generate_glyphs(msdf_gl_font_t font, int32_t start, int32_t end) {
         point_ptr += point_sizes[i];
 
         if (font->_offset_x + buffer_width > font->texture_width) {
-            font->_offset_y += (y_increment + 1);
+            font->_offset_y += (font->_y_increment + 1);
             font->_offset_x = 1;
-            y_increment = 0;
+            font->_y_increment = 0;
         }
-        y_increment = buffer_height > y_increment ? buffer_height : y_increment;
+        font->_y_increment = buffer_height > font->_y_increment ? buffer_height : font->_y_increment;
 
         atlas_index[i].offset_x = font->_offset_x;
         atlas_index[i].offset_y = font->_offset_y;
@@ -297,30 +366,28 @@ int msdf_gl_generate_glyphs(msdf_gl_font_t font, int32_t start, int32_t end) {
 
         while ((font->_offset_y + buffer_height) > new_texture_height) {
             new_texture_height *= 2;
-            fprintf(stderr, "increasing to %d\n", new_texture_height);
+            fprintf(stderr, "increasing atlas to %d\n", new_texture_height);
         }
         if (new_texture_height > font->context->_max_texture_size) {
             fprintf(stderr, "too big!\n");
-            free(point_data);
-            free(metadata);
-            free(meta_sizes);
-            free(point_sizes);
-            free(atlas_index);
-            return -1;
+            goto error;
+        }
+        while ((font->_nallocated + i) > new_index_size) {
+            new_index_size *= 2;
+            fprintf(stderr, "increasing index to %d\n", new_index_size);
         }
     }
 
-    /* We do not want the scissoring to have any affect here. */
+    /* We do not want the scissoring or depth testing to have any affect here. */
     glDisable(GL_SCISSOR_TEST);
+    glDisable(GL_DEPTH_TEST);
 
     /* Allocate and fill the buffers on GPU. */
     glBindBuffer(GL_ARRAY_BUFFER, font->_meta_input_buffer);
     glBufferData(GL_ARRAY_BUFFER, meta_size_sum, metadata, GL_STATIC_READ);
-    free(metadata);
 
     glBindBuffer(GL_ARRAY_BUFFER, font->_point_input_buffer);
     glBufferData(GL_ARRAY_BUFFER, point_size_sum, point_data, GL_STATIC_READ);
-    free(point_data);
 
     glBindBuffer(GL_ARRAY_BUFFER, font->_index_buffer);
     glBufferData(GL_ARRAY_BUFFER, index_size, atlas_index, GL_STATIC_READ);
@@ -372,10 +439,7 @@ int msdf_gl_generate_glyphs(msdf_gl_font_t font, int32_t start, int32_t end) {
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
             glDeleteFramebuffers(1, &new_framebuffer);
             glDeleteTextures(1, &new_texture);
-            free(meta_sizes);
-            free(point_sizes);
-            free(atlas_index);
-            return -2;
+            goto error;
         }
 
         glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
@@ -481,12 +545,27 @@ int msdf_gl_generate_glyphs(msdf_gl_font_t font, int32_t start, int32_t end) {
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-    free(meta_sizes);
-    free(point_sizes);
-    free(atlas_index);
+    font->_nglyphs += (end - start + 1);
+    retval = end - start;
 
-    font->_nglyphs += end - start;
-    return end - start;
+ error:
+
+    if (meta_sizes)
+        free(meta_sizes);
+    if (point_sizes)
+        free(point_sizes);
+    if (atlas_index)
+        free(atlas_index);
+    if (point_data)
+        free(point_data);
+    if (metadata)
+        free(metadata);
+
+    return retval;
+}
+
+int msdf_gl_generate_glyph(msdf_gl_font_t font, int32_t character) {
+    return msdf_gl_generate_glyphs(font, character, character);
 }
 
 void msdf_gl_destroy_context(msdf_gl_context_t ctx) {
@@ -518,6 +597,10 @@ void msdf_gl_destroy_font(msdf_gl_font_t font) {
 
 void msdf_gl_render(msdf_gl_font_t font, msdf_gl_glyph_t *glyphs, int n,
                     GLfloat *projection) {
+
+    for (int i = 0; i < n; ++i) {
+        glyphs[i].key = msdfgl_map_get(&font->character_index, glyphs[i].key)->index;
+    }
 
     GLuint glyph_buffer;
     GLuint vao;

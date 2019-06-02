@@ -227,7 +227,8 @@ static void keyboard_key(void *data, struct wl_keyboard *wl_keyboard, uint32_t s
     if (sym == XKB_KEY_c) {
         frame_close(selected_frame);
     } else if (sym == XKB_KEY_r) {
-        msdf_gl_generate_ascii(active_font);
+        /* msdf_gl_generate_ascii(active_font); */
+        msdf_gl_generate_glyph(active_font, 0x00e4);
         wl_surface_commit(selected_frame->surface);
     } else if (sym == XKB_KEY_n) {
         frame_create();

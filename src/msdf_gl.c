@@ -366,15 +366,12 @@ int msdf_gl_generate_glyphs(msdf_gl_font_t font, int32_t start, int32_t end) {
 
         while ((font->_offset_y + buffer_height) > new_texture_height) {
             new_texture_height *= 2;
-            fprintf(stderr, "increasing atlas to %d\n", new_texture_height);
         }
         if (new_texture_height > font->context->_max_texture_size) {
-            fprintf(stderr, "too big!\n");
             goto error;
         }
-        while ((font->_nallocated + i) > new_index_size) {
+        while ((font->_nglyphs + i + 1) > new_index_size) {
             new_index_size *= 2;
-            fprintf(stderr, "increasing index to %d\n", new_index_size);
         }
     }
 
@@ -389,8 +386,27 @@ int msdf_gl_generate_glyphs(msdf_gl_font_t font, int32_t start, int32_t end) {
     glBindBuffer(GL_ARRAY_BUFFER, font->_point_input_buffer);
     glBufferData(GL_ARRAY_BUFFER, point_size_sum, point_data, GL_STATIC_READ);
 
-    glBindBuffer(GL_ARRAY_BUFFER, font->_index_buffer);
-    glBufferData(GL_ARRAY_BUFFER, index_size, atlas_index, GL_STATIC_READ);
+    if (font->_nallocated == new_index_size) {
+        glBindBuffer(GL_ARRAY_BUFFER, font->_index_buffer);
+    } else {
+        GLuint new_buffer;
+        glGenBuffers(1, &new_buffer);
+        glBindBuffer(GL_ARRAY_BUFFER, new_buffer);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(msdf_gl_index_entry) * new_index_size,
+                     0, GL_STATIC_READ);
+        if (font->_nglyphs) {
+            glBindBuffer(GL_COPY_READ_BUFFER, font->_index_buffer);
+            glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_ARRAY_BUFFER, 0, 0,
+                                font->_nglyphs * sizeof(msdf_gl_index_entry));
+            glBindBuffer(GL_COPY_READ_BUFFER, 0);
+        }
+        font->_nallocated = new_index_size;
+        glDeleteBuffers(1, &font->_index_buffer);
+        font->_index_buffer = new_buffer;
+    }
+    glBufferSubData(GL_ARRAY_BUFFER, sizeof(msdf_gl_index_entry) * font->_nglyphs,
+                    index_size, atlas_index);
+
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 
@@ -415,12 +431,10 @@ int msdf_gl_generate_glyphs(msdf_gl_font_t font, int32_t start, int32_t end) {
     /* Generate the atlas texture and bind it as the framebuffer. */
     if (font->_texture_height == new_texture_height) {
         /* No need to extend the texture. */
-        fprintf(stderr, "using old texture...\n");
         glBindFramebuffer(GL_DRAW_FRAMEBUFFER, font->_atlas_framebuffer);
         glBindTexture(GL_TEXTURE_2D, font->atlas_texture);
         glViewport(0, 0, font->texture_width, font->_texture_height);
     } else {
-        fprintf(stderr, "generating new texture...\n");
         GLuint new_texture;
         GLuint new_framebuffer;
         glGenTextures(1, &new_texture);
@@ -444,7 +458,6 @@ int msdf_gl_generate_glyphs(msdf_gl_font_t font, int32_t start, int32_t end) {
 
         glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
                                new_texture, 0);
-        fprintf(stderr, "new texture height: %d\n", new_texture_height);
         glViewport(0, 0, font->texture_width, new_texture_height);
         glClearColor(0.0, 0.0, 0.0, 1.0);
         glClear(GL_COLOR_BUFFER_BIT);
@@ -599,7 +612,8 @@ void msdf_gl_render(msdf_gl_font_t font, msdf_gl_glyph_t *glyphs, int n,
                     GLfloat *projection) {
 
     for (int i = 0; i < n; ++i) {
-        glyphs[i].key = msdfgl_map_get(&font->character_index, glyphs[i].key)->index;
+        map_elem_t *e = msdfgl_map_get(&font->character_index, glyphs[i].key);
+        glyphs[i].key = e ? e->index : 0;
     }
 
     GLuint glyph_buffer;

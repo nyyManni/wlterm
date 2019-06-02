@@ -792,7 +792,7 @@ void window_render(struct window *w) {
         {550.0, 80.0, 0xffffffff, '.', (float)font_size, 0.0, 0.0, 0.5},
 
 
-        /* {600.0, 80.0, 0xffffffff, 0x00e4, (float)font_size, 0.0, 0.0, 0.5}, */
+        {600.0, 80.0, 0xffffffff, 0x00e4, (float)font_size, 0.0, 0.0, 0.5},
     };
 
     msdf_gl_render(active_font, glyphs, sizeof(glyphs) / sizeof(msdf_gl_glyph_t), (GLfloat *)w->projection);

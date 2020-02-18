@@ -21,23 +21,8 @@
 #include "egl_window.h"
 #include "egl_util.h"
 
-#include "msdfgl.h"
 
-struct wl_display *g_display;
-struct wl_compositor *g_compositor;
-struct wl_seat *g_seat;
-struct xkb_keymap *g_xkb_keymap;
-struct xkb_state *g_xkb_state;
-struct wl_keyboard *g_kbd;
-struct wl_pointer *g_pointer;
-struct xdg_wm_base *g_xdg_wm_base;
-struct wl_shm *g_shm;
 
-/* extern struct frame *selected_frame; */
-extern struct frame *frames[];
-extern int open_frames;
-
-extern msdfgl_font_t active_font;
 
 static void pointer_handle_enter(void *data, struct wl_pointer *pointer, uint32_t serial,
                                  struct wl_surface *surface, wl_fixed_t sx,
@@ -56,7 +41,7 @@ static void pointer_handle_motion(void *data, struct wl_pointer *pointer, uint32
 static void pointer_handle_button(void *data, struct wl_pointer *wl_pointer,
                                   uint32_t serial, uint32_t time, uint32_t button,
                                   uint32_t state) {
-    struct window *w = selected_frame->root_window;
+    struct window *w = active_frame->root_window;
 
     for (uint32_t axis = 0; axis < 2;++axis)
         w->_scrolling_freely[axis] = false;
@@ -64,7 +49,7 @@ static void pointer_handle_button(void *data, struct wl_pointer *wl_pointer,
 
 static void pointer_handle_axis(void *data, struct wl_pointer *wl_pointer, uint32_t time,
                                 uint32_t axis, wl_fixed_t value) {
-    struct window *w = selected_frame->root_window;
+    struct window *w = active_frame->root_window;
     for (uint32_t axis = 0; axis < 2;++axis)
         w->_scrolling_freely[axis] = false;
     w->_kinetic_scroll[axis] = 0.0;
@@ -79,9 +64,9 @@ static void pointer_handle_axis(void *data, struct wl_pointer *wl_pointer, uint3
 }
 
 static void pointer_handle_frame(void *data, struct wl_pointer *wl_pointer) {
-    struct window *w = selected_frame->root_window;
+    /* struct window *w = active_frame->root_window; */
 
-    wl_surface_commit(selected_frame->surface);
+    wl_surface_commit(active_frame->surface);
 }
 
 static void pointer_handle_axis_source(void *data, struct wl_pointer *wl_pointer,
@@ -90,7 +75,7 @@ static void pointer_handle_axis_source(void *data, struct wl_pointer *wl_pointer
 
 static void pointer_handle_axis_stop(void *data, struct wl_pointer *wl_pointer,
                                      uint32_t time, uint32_t axis) {
-    struct window *w = selected_frame->root_window;
+    struct window *w = active_frame->root_window;
 
     size_t window_len = SCROLL_WINDOW_SIZE;
     double *s_window = w->_scroll_position_buffer[axis];
@@ -156,25 +141,25 @@ static const struct wl_pointer_listener pointer_listener = {
     .axis_discrete = pointer_handle_axis_discrete,
 };
 
-static void touch_handle_down(void *data, struct wl_touch *wl_touch, uint32_t serial,
-                              uint32_t time, struct wl_surface *surface, int32_t id,
-                              wl_fixed_t x_w, wl_fixed_t y_w) {
-}
+/* static void touch_handle_down(void *data, struct wl_touch *wl_touch, uint32_t serial, */
+/*                               uint32_t time, struct wl_surface *surface, int32_t id, */
+/*                               wl_fixed_t x_w, wl_fixed_t y_w) { */
+/* } */
 
-static void touch_handle_up(void *data, struct wl_touch *wl_touch, uint32_t serial,
-                            uint32_t time, int32_t id) {}
+/* static void touch_handle_up(void *data, struct wl_touch *wl_touch, uint32_t serial, */
+/*                             uint32_t time, int32_t id) {} */
 
-static void touch_handle_motion(void *data, struct wl_touch *wl_touch, uint32_t time,
-                                int32_t id, wl_fixed_t x_w, wl_fixed_t y_w) {}
+/* static void touch_handle_motion(void *data, struct wl_touch *wl_touch, uint32_t time, */
+/*                                 int32_t id, wl_fixed_t x_w, wl_fixed_t y_w) {} */
 
-static void touch_handle_frame(void *data, struct wl_touch *wl_touch) {}
+/* static void touch_handle_frame(void *data, struct wl_touch *wl_touch) {} */
 
-static void touch_handle_cancel(void *data, struct wl_touch *wl_touch) {}
+/* static void touch_handle_cancel(void *data, struct wl_touch *wl_touch) {} */
 
-static const struct wl_touch_listener touch_listener = {
-    touch_handle_down,  touch_handle_up,     touch_handle_motion,
-    touch_handle_frame, touch_handle_cancel,
-};
+/* static const struct wl_touch_listener touch_listener = { */
+/*     touch_handle_down,  touch_handle_up,     touch_handle_motion, */
+/*     touch_handle_frame, touch_handle_cancel, */
+/* }; */
 
 static void keyboard_keymap(void *data, struct wl_keyboard *wl_keyboard, uint32_t format,
                             int32_t fd, uint32_t size) {
@@ -195,13 +180,13 @@ static void keyboard_keymap(void *data, struct wl_keyboard *wl_keyboard, uint32_
     munmap(map_shm, size);
     close(fd);
 
-    g_xkb_state = xkb_state_new(xkb_keymap);
+    root_context.xkb_state = xkb_state_new(xkb_keymap);
 }
 
 static void keyboard_enter(void *data, struct wl_keyboard *wl_keyboard, uint32_t serial,
                            struct wl_surface *surface, struct wl_array *keys) {
 
-    selected_frame = wl_surface_get_user_data(surface);
+    active_frame = wl_surface_get_user_data(surface);
     // Who cares
 }
 
@@ -220,16 +205,18 @@ static void keyboard_modifiers(void *data, struct wl_keyboard *keyboard, uint32_
 static void keyboard_key(void *data, struct wl_keyboard *wl_keyboard, uint32_t serial,
                          uint32_t time, uint32_t key, uint32_t _key_state) {
     enum wl_keyboard_key_state key_state = _key_state;
-    xkb_keysym_t sym = xkb_state_key_get_one_sym(g_xkb_state, key + 8);
+    xkb_keysym_t sym = xkb_state_key_get_one_sym(root_context.xkb_state, key + 8);
 
     if (key_state != WL_KEYBOARD_KEY_STATE_PRESSED)
         return;
     if (sym == XKB_KEY_c) {
-        frame_close(selected_frame);
+        frame_close(active_frame);
     } else if (sym == XKB_KEY_r) {
         /* msdfgl_generate_ascii(active_font); */
-        msdfgl_generate_glyph(active_font, 0x00e4);
-        wl_surface_commit(selected_frame->surface);
+        /* msdfgl_generate_glyph(active_font, 0x00e4); */
+        /* msdfgl_generate_glyph(active_font, '/'); */
+    msdfgl_generate_glyphs(active_font, '/', '/');
+        wl_surface_commit(active_frame->surface);
     } else if (sym == XKB_KEY_n) {
         frame_create();
     }
@@ -246,14 +233,14 @@ static const struct wl_keyboard_listener keyboard_listener = {
 
 static void seat_handle_capabilities(void *data, struct wl_seat *wl_seat,
                                      enum wl_seat_capability caps) {
-    struct frame *w = data;
+    /* struct frame *w = data; */
     if (caps & WL_SEAT_CAPABILITY_KEYBOARD) {
-        g_kbd = wl_seat_get_keyboard(g_seat);
-        wl_keyboard_add_listener(g_kbd, &keyboard_listener, NULL);
+        root_context.kbd = wl_seat_get_keyboard(root_context.seat);
+        wl_keyboard_add_listener(root_context.kbd, &keyboard_listener, NULL);
     }
     if (caps & WL_SEAT_CAPABILITY_POINTER) {
-        g_pointer = wl_seat_get_pointer(g_seat);
-        wl_pointer_add_listener(g_pointer, &pointer_listener, NULL);
+        root_context.pointer = wl_seat_get_pointer(root_context.seat);
+        wl_pointer_add_listener(root_context.pointer, &pointer_listener, NULL);
     }
 }
 static void seat_handle_name(void *data, struct wl_seat *wl_seat, const char *name) {
@@ -270,17 +257,17 @@ static void handle_global(void *data, struct wl_registry *registry, uint32_t nam
                           const char *interface, uint32_t version) {
 
     if (strcmp(interface, wl_compositor_interface.name) == 0) {
-        g_compositor = wl_registry_bind(registry, name, &wl_compositor_interface, version);
+        root_context.compositor = wl_registry_bind(registry, name, &wl_compositor_interface, version);
 
     } else if (strcmp(interface, wl_seat_interface.name) == 0) {
-        g_seat = wl_registry_bind(registry, name, &wl_seat_interface, version);
-        wl_seat_add_listener(g_seat, &seat_listener, NULL);
+        root_context.seat = wl_registry_bind(registry, name, &wl_seat_interface, version);
+        wl_seat_add_listener(root_context.seat, &seat_listener, NULL);
 
     } else if (strcmp(interface, wl_shm_interface.name) == 0) {
-        g_shm = wl_registry_bind(registry, name, &wl_shm_interface, version);
+        root_context.shm = wl_registry_bind(registry, name, &wl_shm_interface, version);
 
     } else if (strcmp(interface, xdg_wm_base_interface.name) == 0) {
-        g_xdg_wm_base = wl_registry_bind(registry, name, &xdg_wm_base_interface, version);
+        root_context.xdg_wm_base = wl_registry_bind(registry, name, &xdg_wm_base_interface, version);
     }
 }
 
@@ -295,15 +282,17 @@ static const struct wl_registry_listener registry_listener = {
 
 int main(int argc, char *argv[]) {
 
-    g_display = wl_display_connect(NULL);
-    struct wl_registry *registry = wl_display_get_registry(g_display);
+    root_context.display = wl_display_connect(NULL);
+    struct wl_registry *registry = wl_display_get_registry(root_context.display);
     wl_registry_add_listener(registry, &registry_listener, NULL);
 
-    wl_display_roundtrip(g_display);
+    wl_display_roundtrip(root_context.display);
     init_egl();
-    if (!load_font("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf", 15)) {
+
+    if (!load_font("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf")) {
+    /* if (!load_font("/usr/share/fonts/truetype/liberation/LiberationSerif-Regular.ttf", 15)) { */
         wl_registry_destroy(registry);
-        wl_display_disconnect(g_display);
+        wl_display_disconnect(root_context.display);
         return 1;
     }
 
@@ -313,11 +302,11 @@ int main(int argc, char *argv[]) {
         f->root_window->contents = read_buffer_contents(argv[1], &f->root_window->nlines);
     }
 
-    while (wl_display_dispatch(g_display) != -1 && open_frames) {}
+    while (wl_display_dispatch(root_context.display) != -1 && open_frames) {}
     kill_egl();
 
     wl_registry_destroy(registry);
-    wl_display_disconnect(g_display);
+    wl_display_disconnect(root_context.display);
 
     return 0;
 }

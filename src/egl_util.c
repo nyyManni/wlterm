@@ -7,6 +7,7 @@
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
 
+
 bool check_egl_extension(const char *extensions, const char *extension) {
 	size_t extlen = strlen(extension);
 	const char *end = extensions + strlen(extensions);

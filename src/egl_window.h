@@ -8,11 +8,12 @@
 #include <GLES2/gl2.h>
 #include <EGL/egl.h>
 #include <msdf.h>
+#include <msdfgl.h>
 
 #include <cglm/mat4.h>
 
 #define MAX_FRAMES 64
-#define SCALE 2
+#define SCALE 1
 #define MAX_GLYPHS_PER_DRAW 8192
 #define SCROLL_WINDOW_SIZE 5
 
@@ -21,19 +22,32 @@ struct frame;
 
 struct display_info {
 
-    struct wl_dsplay *display;
+    struct wl_display *display;
     struct wl_compositor *compositor;
     struct xdg_wm_base *xdg_wm_base;
+
+    struct wl_seat *seat;
+    struct wl_shm *shm;
+
+    struct xkb_keymap *xkb_keymap;
+    struct xkb_state *xkb_state;
+    struct wl_keyboard *kbd;
+    struct wl_pointer *pointer;
+
     EGLDisplay gl_display;
     EGLConfig gl_conf;
-    EGLContext root_context;
+    EGLContext gl_context;
 
+    msdfgl_context_t msdfgl_ctx;
     struct frame *root_frame;
 };
+extern struct display_info root_context;
 
 
-
-extern struct frame *selected_frame;
+extern struct frame *active_frame;
+extern struct frame *frames[];
+extern int open_frames;
+extern msdfgl_font_t active_font;
 
 struct frame {
 
@@ -155,31 +169,31 @@ struct font {
     for (struct window *w = frame->root_window; w; w = w->next)
 
 
-struct gl_glyph {
-    GLfloat x;
-    GLfloat y; 
-    GLuint color;
-    GLint key;
-    GLfloat size;
-    GLfloat offset;
-    GLfloat skew;
-    GLfloat strength;
-};
-struct gl_overlay_vertex {GLfloat x; GLfloat y; GLuint c;};
-struct gl_glyph_atlas_item {
-    GLfloat offset_x;
-    GLfloat offset_y;
-    GLfloat size_x;
-    GLfloat size_y;
-    GLfloat bearing_x;
-    GLfloat bearing_y;
-    GLfloat glyph_width;
-    GLfloat glyph_height;
-};
+/* struct gl_glyph { */
+/*     GLfloat x; */
+/*     GLfloat y;  */
+/*     GLuint color; */
+/*     GLint key; */
+/*     GLfloat size; */
+/*     GLfloat offset; */
+/*     GLfloat skew; */
+/*     GLfloat strength; */
+/* }; */
+/* struct gl_overlay_vertex {GLfloat x; GLfloat y; GLuint c;}; */
+/* struct gl_glyph_atlas_item { */
+/*     GLfloat offset_x; */
+/*     GLfloat offset_y; */
+/*     GLfloat size_x; */
+/*     GLfloat size_y; */
+/*     GLfloat bearing_x; */
+/*     GLfloat bearing_y; */
+/*     GLfloat glyph_width; */
+/*     GLfloat glyph_height; */
+/* }; */
 
 void init_egl();
 void kill_egl();
-struct font *load_font(const char *, int);
+struct font *load_font(const char *);
 struct frame *frame_create();
 void frame_close(struct frame *);
 void frame_resize(struct frame *, int, int);

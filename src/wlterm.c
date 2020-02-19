@@ -32,9 +32,6 @@
 /* double font_size = 10.0; */
 double font_size = 10.0;
 
-
-GLenum err;
-
 msdfgl_font_t active_font;
 
 int parse_color(const char *color, vec3 ret) {
@@ -47,8 +44,6 @@ int parse_color(const char *color, vec3 ret) {
     return 1;
 };
 
-
-struct wlterm_frame *active_frame;
 
 static const EGLint context_attribs[] = {EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE};
 
@@ -173,7 +168,8 @@ static void keyboard_keymap(void *data, struct wl_keyboard *wl_keyboard, uint32_
 static void keyboard_enter(void *data, struct wl_keyboard *wl_keyboard, uint32_t serial,
                            struct wl_surface *surface, struct wl_array *keys) {
 
-    active_frame = wl_surface_get_user_data(surface);
+    struct wlterm_application *app = data;
+    app->active_frame = wl_surface_get_user_data(surface);
     // Who cares
 }
 
@@ -197,10 +193,14 @@ static void keyboard_key(void *data, struct wl_keyboard *wl_keyboard, uint32_t s
 
     if (key_state != WL_KEYBOARD_KEY_STATE_PRESSED)
         return;
-    if (sym == XKB_KEY_c) {
-        wlterm_frame_destroy(active_frame);
-    } else if (sym == XKB_KEY_n) {
+
+    switch (sym) {
+    case XKB_KEY_c:
+        wlterm_frame_destroy(app->active_frame);
+        break;
+    case XKB_KEY_n:
         wlterm_frame_create(app);
+        break;
     }
 }
 

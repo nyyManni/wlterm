@@ -15,6 +15,7 @@
 struct wlterm_window;
 struct wlterm_frame;
 
+
 struct wlterm_application {
 
     struct wl_display *display;
@@ -36,9 +37,9 @@ struct wlterm_application {
 
     msdfgl_context_t msdfgl_ctx;
     struct wlterm_frame *root_frame;
+    struct wlterm_frame *active_frame;
 };
 
-extern struct wlterm_frame *active_frame;
 
 struct wlterm_frame {
     struct wlterm_application *application;
@@ -85,6 +86,8 @@ struct wlterm_window {
 
     mat4 projection;
 };
+
+
 
 struct wlterm_application *wlterm_application_create();
 void wlterm_application_destroy(struct wlterm_application *);

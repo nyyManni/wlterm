@@ -11,8 +11,6 @@
 
 #include <cglm/mat4.h>
 
-#define MAX_FRAMES 64
-#define SCROLL_WINDOW_SIZE 5
 
 struct wlterm_window;
 struct wlterm_frame;
@@ -39,17 +37,14 @@ struct wlterm_application {
     msdfgl_context_t msdfgl_ctx;
     struct wlterm_frame *root_frame;
 };
-/* extern struct wlterm_application wlterm_ctx; */
 
 extern struct wlterm_frame *active_frame;
-extern struct wlterm_frame *frames[];
-extern int open_frames;
-extern msdfgl_font_t active_font;
 
 struct wlterm_frame {
     struct wlterm_application *application;
 
     struct wlterm_frame *next;
+    struct wlterm_frame *prev;
     struct wl_surface *surface;
     struct xdg_surface *xdg_surface;
     struct xdg_toplevel *xdg_toplevel;
@@ -104,7 +99,6 @@ void wlterm_window_destroy(struct wlterm_window *);
     for (struct wlterm_window *w = frame->root_window; w; w = w->next)
 
 void wlterm_frame_resize(struct wlterm_frame *, int, int);
-/* struct window *window_create(struct frame *); */
 void wlterm_frame_render(struct wlterm_frame *);
 
 #define WLTERM_CHECK_GLERROR \

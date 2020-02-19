@@ -51,7 +51,7 @@ endforeach
 # endforeach
 
 
-wlterm_src = ['src/wlterm.c', 'src/egl_util.c', 'src/egl_window.c'] + protos_src + protos_headers
+wlterm_src = ['src/main.c', 'src/egl_util.c', 'src/wlterm.c'] + protos_src + protos_headers
 wlterm_deps = [wayland_client, msdfgl, rt, m, freetype, egl, gl, wayland_egl, xkbcommon]
 
 executable('wlterm', wlterm_src, dependencies: wlterm_deps, install: true)

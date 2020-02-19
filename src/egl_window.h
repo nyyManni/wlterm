@@ -7,22 +7,20 @@
 
 #include <GLES2/gl2.h>
 #include <EGL/egl.h>
-#include <msdf.h>
 #include <msdfgl.h>
 
 #include <cglm/mat4.h>
 
 #define MAX_FRAMES 64
-#define SCALE 1
-#define MAX_GLYPHS_PER_DRAW 8192
 #define SCROLL_WINDOW_SIZE 5
 
-struct window;
-struct frame;
+struct wlterm_window;
+struct wlterm_frame;
 
-struct display_info {
+struct wlterm_application {
 
     struct wl_display *display;
+    struct wl_registry *registry;
     struct wl_compositor *compositor;
     struct xdg_wm_base *xdg_wm_base;
 
@@ -39,19 +37,19 @@ struct display_info {
     EGLContext gl_context;
 
     msdfgl_context_t msdfgl_ctx;
-    struct frame *root_frame;
+    struct wlterm_frame *root_frame;
 };
-extern struct display_info root_context;
+/* extern struct wlterm_application wlterm_ctx; */
 
-
-extern struct frame *active_frame;
-extern struct frame *frames[];
+extern struct wlterm_frame *active_frame;
+extern struct wlterm_frame *frames[];
 extern int open_frames;
 extern msdfgl_font_t active_font;
 
-struct frame {
+struct wlterm_frame {
+    struct wlterm_application *application;
 
-    struct frame *next;
+    struct wlterm_frame *next;
     struct wl_surface *surface;
     struct xdg_surface *xdg_surface;
     struct xdg_toplevel *xdg_toplevel;
@@ -68,44 +66,20 @@ struct frame {
     /* OpenGL */
     struct wl_egl_window *gl_window;
 
-    EGLContext gl_ctx;
+    EGLContext gl_context;
     EGLConfig gl_conf;
     EGLDisplay gl_display;
     EGLSurface gl_surface;
 
     mat4 projection;
 
-    /* GLuint text_shader; */
-    GLuint bg_shader;
-    GLuint overlay_shader;
-
-    struct window *root_window;
-
-    GLuint projection_uniform;
-    /* GLuint font_projection_uniform; */
-    /* GLuint font_texture_uniform; */
-    /* GLuint font_vertex_uniform; */
-    /* GLuint font_padding_uniform; */
-    
-    /* GLuint msdf_projection_uniform; */
-    /* GLuint msdf_vertex_uniform; */
-
-    GLuint overlay_projection_uniform;
-    GLuint overlay_offset_uniform;
-
-    GLuint bg_projection_uniform;
-    GLuint bg_accent_color_uniform;
-    /* GLuint offset_uniform; */
-
-    bool has_minibuffer_p;
-    int minibuffer_height;
-
+    struct wlterm_window *root_window;
 
 };
 
-struct window {
-    struct frame *frame;
-    struct window *next;
+struct wlterm_window {
+    struct wlterm_frame *frame;
+    struct wlterm_window *next;
 
     /* Window position in frame's coordinates */
     int x;
@@ -114,90 +88,31 @@ struct window {
     int width;
     int height;
 
-    int linum_width;
-
-    /* Window contents. */
-    GLuint linum_glyphs;
-    GLuint left_fringe_glyphs;
-    GLuint right_fringe_glyphs;
-    GLuint left_margin_glyphs;
-    GLuint right_margin_glyphs;
-    GLuint text_area_glyphs;
-    GLuint modeline_glyphs;
-
-    GLuint rect_vbo;
-
     mat4 projection;
-
-    /* Scrolling stuff */
-    double position[2];
-    bool _scrolling_freely[2];
-
-    uint32_t _scroll_time_buffer[2][SCROLL_WINDOW_SIZE];
-    double _scroll_position_buffer[2][SCROLL_WINDOW_SIZE];
-
-    double _kinetic_scroll[2];
-    uint32_t _kinetic_scroll_t0[2];
-
-    char **contents;
-    uint32_t nlines;
 };
 
-struct font {
-    /* GLuint texture; */
-    /* GLuint vertex_texture; */
-    /* GLuint vertex_buffer; */
+struct wlterm_application *wlterm_application_create();
+void wlterm_application_destroy(struct wlterm_application *);
+int wlterm_application_run(struct wlterm_application *);
+struct wlterm_frame *wlterm_frame_create(struct wlterm_application *);
+void wlterm_frame_destroy(struct wlterm_frame *);
+struct wlterm_window *wlterm_window_create(struct wlterm_frame *);
+void wlterm_window_destroy(struct wlterm_window *);
 
-    /* GLuint msdf_glyph_uniform; */
-    /* GLuint msdf_glyph_texture; */
-    /* GLuint msdf_atlas_texture; */
-    /* GLuint msdf_framebuffer; */
-
-    /* mat4 texture_projection; */
-
-    /* int texture_size; */
-
-    /* float vertical_advance; */
-
-    /* float horizontal_advances[254]; */
-    
-    /* msdf_font_handle msdf_font; */
-
-};
 
 #define FOR_EACH_WINDOW(frame, w) \
-    for (struct window *w = frame->root_window; w; w = w->next)
+    for (struct wlterm_window *w = frame->root_window; w; w = w->next)
 
+void wlterm_frame_resize(struct wlterm_frame *, int, int);
+/* struct window *window_create(struct frame *); */
+void wlterm_frame_render(struct wlterm_frame *);
 
-/* struct gl_glyph { */
-/*     GLfloat x; */
-/*     GLfloat y;  */
-/*     GLuint color; */
-/*     GLint key; */
-/*     GLfloat size; */
-/*     GLfloat offset; */
-/*     GLfloat skew; */
-/*     GLfloat strength; */
-/* }; */
-/* struct gl_overlay_vertex {GLfloat x; GLfloat y; GLuint c;}; */
-/* struct gl_glyph_atlas_item { */
-/*     GLfloat offset_x; */
-/*     GLfloat offset_y; */
-/*     GLfloat size_x; */
-/*     GLfloat size_y; */
-/*     GLfloat bearing_x; */
-/*     GLfloat bearing_y; */
-/*     GLfloat glyph_width; */
-/*     GLfloat glyph_height; */
-/* }; */
-
-void init_egl();
-void kill_egl();
-struct font *load_font(const char *);
-struct frame *frame_create();
-void frame_close(struct frame *);
-void frame_resize(struct frame *, int, int);
-struct window *window_create(struct frame *);
-void frame_render(struct frame *);
+#define WLTERM_CHECK_GLERROR \
+    do {                                                             \
+        GLenum err = glGetError();                                   \
+        if (err) {                                                   \
+            fprintf(stderr, "line %d error: %x \n", __LINE__, err);  \
+        }                                                            \
+    } while (0);
 
 #endif /* EGL_WINDOW_H */
